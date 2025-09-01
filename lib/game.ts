@@ -71,7 +71,10 @@ export function joinGame(game: Game, player: Player): Game {
 }
 
 export function leaveGame(game: Game, playerId: string): Game {
-  const players = game.players.filter((p) => p.id !== playerId)
+  const leaving = game.players.find((p) => p.id === playerId)
+  const players = leaving
+    ? game.players.filter((p) => p.seatId !== leaving.seatId)
+    : game.players.filter((p) => p.id !== playerId)
   let status: GameStatus = game.status
   let turnPlayerId = game.turnPlayerId
   if (turnPlayerId === playerId) {
@@ -84,13 +87,23 @@ export function leaveGame(game: Game, playerId: string): Game {
 export function startRound(game: Game): Game {
   if (game.players.length === 0) return game
   const deck = newDeck()
-  const players: Player[] = game.players.map((p) => ({
+  // Collapse any split hands from previous rounds: keep one player per seatId
+  const uniqueSeats: Player[] = []
+  const seen = new Set<string>()
+  for (const p of game.players) {
+    if (!seen.has(p.seatId)) {
+      seen.add(p.seatId)
+      uniqueSeats.push(p)
+    }
+  }
+  const players: Player[] = uniqueSeats.map((p) => ({
     ...p,
     cards: [] as Card[],
     value: 0,
     busted: false,
     stood: false,
     doubled: false,
+    insurance: undefined,
   })) as Player[]
   const dealer: Dealer = { cards: [], value: 0 }
 
