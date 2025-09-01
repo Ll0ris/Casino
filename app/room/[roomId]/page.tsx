@@ -1,0 +1,137 @@
+"use client"
+import { use, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import type { ClientGameState } from '@/lib/types'
+import GameTable from '@/components/GameTable'
+
+export default function RoomPage({ params }: { params: Promise<{ roomId: string }> }) {
+  const { roomId } = use(params)
+  const router = useRouter()
+  const [state, setState] = useState<ClientGameState | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [intervalMs, setIntervalMs] = useState(1200)
+  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const [playerToken, setPlayerToken] = useState('')
+
+  useEffect(() => {
+    // Ensure player token exists even on deep-link
+    const existing = localStorage.getItem('playerToken')
+    if (existing) {
+      setPlayerToken(existing)
+    } else {
+      const t = crypto.randomUUID()
+      localStorage.setItem('playerToken', t)
+      setPlayerToken(t)
+    }
+  }, [])
+
+  const poll = async () => {
+    try {
+      const res = await fetch(`/api/rooms/${roomId}`, {
+        headers: { 'x-player-token': playerToken },
+        cache: 'no-store',
+      })
+      if (res.status === 404) {
+        setError('Oda bulunamadı veya silindi.')
+        return
+      }
+      const data = (await res.json()) as ClientGameState
+      setState(data)
+      setError(null)
+    } catch (e) {
+      setError('Ağ hatası, tekrar denenecek...')
+    }
+  }
+
+  useEffect(() => {
+    poll()
+    timerRef.current = setInterval(poll, intervalMs)
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+    // Recreate interval when token/room/interval changes
+  }, [roomId, intervalMs, playerToken])
+
+  const onAction = async (action: 'hit' | 'stand' | 'start') => {
+    if (action === 'start') {
+      await fetch(`/api/rooms/${roomId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-player-token': playerToken,
+        },
+        body: JSON.stringify({ op: 'start' }),
+      })
+      return poll()
+    }
+    await fetch(`/api/rooms/${roomId}/action`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-player-token': playerToken,
+      },
+      body: JSON.stringify({ action }),
+    })
+    poll()
+  }
+
+  const onLeave = async () => {
+    await fetch(`/api/rooms/${roomId}/action`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-player-token': playerToken,
+      },
+      body: JSON.stringify({ action: 'leave' }),
+    })
+    router.push('/')
+  }
+
+  if (error) {
+    return (
+      <main className="grid gap-4">
+        <h1 className="text-xl font-semibold">Oda: {roomId}</h1>
+        <p className="text-red-400">{error}</p>
+        <button
+          onClick={() => router.push('/')}
+          className="w-fit rounded-md bg-zinc-700 px-3 py-2 text-sm"
+        >
+          Ana sayfaya dön
+        </button>
+      </main>
+    )
+  }
+
+  if (!state) {
+    return (
+      <main className="grid gap-4">
+        <h1 className="text-xl font-semibold">Oda: {roomId}</h1>
+        <p className="text-zinc-400">Yükleniyor...</p>
+      </main>
+    )
+  }
+
+  return (
+    <main className="grid gap-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Oda: {roomId}</h1>
+          <p className="text-xs text-zinc-400">Durum: {state.status}</p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <span>Güncelleme aralığı</span>
+          <select
+            className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1"
+            value={intervalMs}
+            onChange={(e) => setIntervalMs(parseInt(e.target.value))}
+          >
+            <option value={800}>0.8s</option>
+            <option value={1200}>1.2s</option>
+            <option value={2000}>2s</option>
+          </select>
+        </div>
+      </div>
+      <GameTable state={state} onAction={onAction} onLeave={onLeave} />
+    </main>
+  )
+}
