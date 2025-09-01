@@ -6,12 +6,11 @@
   --bg: 9 35 20; /* casino green base */
 }
 
-/* Casino green gradient */
+/* Flat casino green with subtle dotted pattern */
 body {
-  background: radial-gradient(1200px 600px at 80% -10%, rgba(16,185,129,0.18), transparent 60%),
-              radial-gradient(900px 500px at 10% 10%, rgba(34,197,94,0.15), transparent 60%),
-              linear-gradient(180deg, rgba(6,78,59,0.6), rgba(10,40,24,0.9)),
-              rgb(var(--bg));
+  background-color: rgb(16 94 53);
+  background-image: radial-gradient(rgba(255, 225, 0, 0.15) 1px, transparent 1px);
+  background-size: 20px 20px;
 }
 
 @layer components {

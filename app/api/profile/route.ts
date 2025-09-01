@@ -3,6 +3,20 @@ import { createClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
 
+export async function GET(req: NextRequest) {
+  const SUPABASE_URL = process.env.SUPABASE_URL!
+  const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  const userId = req.headers.get('x-user-id') || ''
+  if (!userId) return Response.json({})
+  const { data } = await supabase
+    .from('profiles')
+    .select('user_id,email,username,balance')
+    .eq('user_id', userId)
+    .single()
+  return Response.json(data || {})
+}
+
 export async function POST(req: NextRequest) {
   const SUPABASE_URL = process.env.SUPABASE_URL!
   const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!
