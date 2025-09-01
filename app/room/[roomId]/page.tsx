@@ -3,6 +3,7 @@ import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ClientGameState } from '@/lib/types'
 import GameTable from '@/components/GameTable'
+import { getSupabaseClient } from '@/lib/supabaseClient'
 
 export default function RoomPage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params)
@@ -44,12 +45,28 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
   }
 
   useEffect(() => {
+    // Start with one fetch for initial state
     poll()
+    // Fallback polling (in case Realtime is unavailable)
     timerRef.current = setInterval(poll, intervalMs)
+
+    // Supabase Realtime: listen table changes and refetch sanitized state
+    const sb = getSupabaseClient()
+    let channel: ReturnType<NonNullable<typeof sb>['channel']> | null = null
+    if (sb) {
+      channel = sb
+        .channel(`rooms:${roomId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, () => {
+          // Use server API to hide dealer hole card
+          poll()
+        })
+        .subscribe()
+    }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
+      if (channel && sb) sb.removeChannel(channel)
     }
-    // Recreate interval when token/room/interval changes
+    // Recreate when deps change
   }, [roomId, intervalMs, playerToken])
 
   const onAction = async (action: 'hit' | 'stand' | 'start') => {
