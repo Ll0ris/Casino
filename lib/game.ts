@@ -26,6 +26,19 @@ export function newDeck(): Card[] {
   return shuffle(deck)
 }
 
+export function newShoe(decks: number): Card[] {
+  const out: Card[] = []
+  const n = Math.max(1, Math.min(6, Math.floor(decks || 1)))
+  for (let i = 0; i < n; i++) out.push(...newDeck())
+  return shuffle(out)
+}
+
+function draw(shoe: Card[]): { card: Card; next: Card[] } {
+  const card = shoe[shoe.length - 1]
+  const next = shoe.slice(0, -1)
+  return { card, next }
+}
+
 export function handValue(cards: Card[]): number {
   let total = 0
   let aces = 0
@@ -62,6 +75,8 @@ export function createGame(id: string, host: Player): Game {
     turnPlayerId: null,
     updatedAt: Date.now(),
     message: undefined,
+    settings: { deckCount: 1, shuffleAt: 35 },
+    shoe: [],
   }
 }
 
@@ -86,7 +101,8 @@ export function leaveGame(game: Game, playerId: string): Game {
 
 export function startRound(game: Game): Game {
   if (game.players.length === 0) return game
-  const deck = newDeck()
+  const needShuffle = game.shoe.length < (game.settings.shuffleAt * game.settings.deckCount)
+  let shoe = needShuffle ? newShoe(game.settings.deckCount) : game.shoe
   // Collapse any split hands from previous rounds: keep one player per seatId
   const uniqueSeats: Player[] = []
   const seen = new Set<string>()
@@ -104,37 +120,49 @@ export function startRound(game: Game): Game {
     stood: false,
     doubled: false,
     insurance: undefined,
+    blackjack: false,
   })) as Player[]
   const dealer: Dealer = { cards: [], value: 0 }
 
   // Initial deal: two cards to each player, dealer one up, one down
   for (let i = 0; i < 2; i++) {
     for (const p of players) {
-      p.cards.push(deck.pop()!)
+      const d1 = draw(shoe); shoe = d1.next; p.cards.push(d1.card)
       p.value = handValue(p.cards)
     }
-    dealer.cards.push(i === 0 ? deck.pop()! : { ...deck.pop()!, hidden: true })
+    const d2 = draw(shoe); shoe = d2.next
+    dealer.cards.push(i === 0 ? d2.card : { ...d2.card, hidden: true })
     dealer.value = handValue(dealer.cards)
   }
 
-  const turnPlayerId = players[0].id
+  // Naturals auto-stand and flagged
+  for (const p of players) {
+    const visible = p.cards.filter(c=>!c.hidden)
+    if (visible.length === 2 && handValue(visible) === 21) {
+      p.blackjack = true
+      p.stood = true
+    }
+  }
+
+  const first = nextTurn(players, null)
   return {
     ...game,
     players,
     dealer,
     status: 'in_round',
-    turnPlayerId,
+    turnPlayerId: first,
     updatedAt: Date.now(),
-    message: undefined,
+    message: needShuffle ? 'Deste karıştırıldı' : undefined,
+    shoe,
   }
 }
 
 export function playerHit(game: Game, playerId: string): Game {
   if (game.status !== 'in_round' || game.turnPlayerId !== playerId) return game
-  const deck = newDeck() // Fresh deck per hit is unrealistic; instead derive from state. For simplicity, we simulate draws.
+  let shoe = game.shoe
   const players = game.players.map((p) => ({ ...p }))
   const me = players.find((p) => p.id === playerId)!
-  me.cards = me.cards.concat(deck.pop()!)
+  const d = draw(shoe); shoe = d.next; me.cards = me.cards.concat(d.card)
   me.value = handValue(me.cards)
   me.busted = me.value > 21
   let turnPlayerId = game.turnPlayerId
@@ -145,24 +173,27 @@ export function playerHit(game: Game, playerId: string): Game {
       turnPlayerId = next
     } else {
       // Dealer reveals and plays
-      const { dealer, msg } = dealerFinish(game.dealer, players)
+      const { dealer, msg, shoe: shoeNext } = dealerFinish(game.dealer, players, shoe)
+      shoe = shoeNext
       message = msg
-      return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, updatedAt: Date.now(), message }
+      return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, updatedAt: Date.now(), message, shoe }
     }
   }
-  return { ...game, players, status: game.status, turnPlayerId, updatedAt: Date.now(), message }
+  return { ...game, players, status: game.status, turnPlayerId, updatedAt: Date.now(), message, shoe }
 }
 
 export function playerStand(game: Game, playerId: string): Game {
   if (game.status !== 'in_round' || game.turnPlayerId !== playerId) return game
+  let shoe = game.shoe
   const players = game.players.map((p) => ({ ...p }))
   const me = players.find((p) => p.id === playerId)!
   me.stood = true
   const next = nextTurn(players, playerId)
   if (next) {
-    return { ...game, players, turnPlayerId: next, updatedAt: Date.now() }
+    return { ...game, players, turnPlayerId: next, updatedAt: Date.now(), shoe }
   }
-  const { dealer, msg } = dealerFinish(game.dealer, players)
+  const { dealer, msg, shoe: shoeNext } = dealerFinish(game.dealer, players, shoe)
+  shoe = shoeNext
   return {
     ...game,
     players,
@@ -171,26 +202,29 @@ export function playerStand(game: Game, playerId: string): Game {
     turnPlayerId: null,
     updatedAt: Date.now(),
     message: msg,
+    shoe,
   }
 }
 
 export function playerDoubleDown(game: Game, playerId: string): Game {
   if (game.status !== 'in_round' || game.turnPlayerId !== playerId) return game
+  let shoe = game.shoe
   const players = game.players.map((p) => ({ ...p }))
   const me = players.find((p) => p.id === playerId)!
   // Allow only on exactly two visible cards and not already doubled
   if (!me || me.doubled || me.cards.filter((c) => !c.hidden).length !== 2) return game
-  const deck = newDeck()
+  const d = draw(shoe); shoe = d.next
   me.doubled = true
-  me.cards = me.cards.concat(deck.pop()!)
+  me.cards = me.cards.concat(d.card)
   me.value = handValue(me.cards)
   me.stood = true
   const next = nextTurn(players, playerId)
   if (next) {
-    return { ...game, players, turnPlayerId: next, updatedAt: Date.now() }
+    return { ...game, players, turnPlayerId: next, updatedAt: Date.now(), shoe }
   }
-  const { dealer, msg } = dealerFinish(game.dealer, players)
-  return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, updatedAt: Date.now(), message: msg }
+  const { dealer, msg, shoe: shoeNext } = dealerFinish(game.dealer, players, shoe)
+  shoe = shoeNext
+  return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, updatedAt: Date.now(), message: msg, shoe }
 }
 
 export function playerSplit(game: Game, playerId: string): Game {
@@ -227,7 +261,7 @@ export function playerSplit(game: Game, playerId: string): Game {
   return { ...game, players, turnPlayerId: first.id, updatedAt: Date.now() }
 }
 
-function dealerFinish(dealer: Dealer, players: Player[]) {
+function dealerFinish(dealer: Dealer, players: Player[], shoe: Card[]) {
   const initial: Card[] = dealer.cards.map((c) => ({ ...c, hidden: false }))
   let value = handValue(initial)
   const initialBlackjack = initial.length === 2 && value === 21
@@ -235,14 +269,15 @@ function dealerFinish(dealer: Dealer, players: Player[]) {
   if (!initialBlackjack) {
     // Draw until 17+
     while (value < 17) {
-      const deck = newDeck()
-      reveal.push(deck.pop()!)
+      const d = draw(shoe)
+      shoe = d.next
+      reveal.push(d.card)
       value = handValue(reveal)
     }
   }
   const finalDealer = { cards: reveal, value }
   const msg = summaryMessage(finalDealer, players)
-  return { dealer: finalDealer, msg, dealerBlackjack: initialBlackjack }
+  return { dealer: finalDealer, msg, dealerBlackjack: initialBlackjack, shoe }
 }
 
 function summaryMessage(dealer: Dealer, players: Player[]): string {
@@ -279,7 +314,9 @@ export function computePayouts(dealer: Dealer, players: Player[], dealerBlackjac
       const ins = Math.max(0, p.insurance || 0)
       // Insurance loses when dealer doesn't have BJ
       delta -= ins
-      if (p.busted) delta += -wager
+      const playerBlackjack = Boolean(p.blackjack)
+      if (playerBlackjack) delta += base * 1.5
+      else if (p.busted) delta += -wager
       else if (dealerBust) delta += wager
       else if (p.value > dealer.value) delta += wager
       else if (p.value < dealer.value) delta += -wager
@@ -342,5 +379,7 @@ export function toClient(game: Game, tokenHash: string) {
         }
       : null,
     message: game.message,
+    settings: game.settings,
+    shoeRemaining: game.shoe.length,
   }
 }

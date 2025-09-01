@@ -101,6 +101,32 @@ export default function GameTable({
           <CopyButton text={`${location.origin}/room/${roomId}`} label="Davet Linki" />
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-300">
+        <div className="flex items-center gap-3">
+          <div className="rounded-md border border-zinc-700/60 bg-zinc-950/40 px-2 py-1">Kalan kart: <span className="font-medium">{state.shoeRemaining}</span></div>
+          <div className="rounded-md border border-zinc-700/60 bg-zinc-950/40 px-2 py-1">Deste sayısı: <span className="font-medium">{state.settings.deckCount}</span></div>
+        </div>
+        {state.isHost && (
+          <div className="flex items-center gap-2">
+            <span className="text-zinc-400">Deste</span>
+            <input
+              type="range"
+              min={1}
+              max={6}
+              defaultValue={state.settings.deckCount}
+              onChange={async (e)=>{
+                const v = parseInt(e.target.value)
+                await fetch(`/api/rooms/${roomId}/settings`, {
+                  method: 'POST',
+                  headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken') || '' },
+                  body: JSON.stringify({ deckCount: v, shuffleAt: 35 })
+                })
+              }}
+            />
+          </div>
+        )}
+      </div>
       <div className="grid gap-2">
         <h2 className="text-lg font-medium">Dağıtıcı</h2>
         <Hand cards={state.dealer.cards} />

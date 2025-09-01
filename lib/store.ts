@@ -246,6 +246,20 @@ export async function insurance(roomId: string, playerToken: string, amount: num
   return next
 }
 
+export async function updateSettings(roomId: string, playerToken: string, deckCount?: number, shuffleAt?: number) {
+  const store = getStore()
+  const g = await store.get(roomId)
+  if (!g) return null
+  const tokenHash = hashToken(playerToken)
+  const me = g.players.find((p) => p.tokenHash === tokenHash)
+  if (!me || !me.isHost) return g
+  const dc = deckCount ? Math.max(1, Math.min(6, Math.floor(deckCount))) : g.settings.deckCount
+  const sa = typeof shuffleAt === 'number' ? Math.max(1, Math.floor(shuffleAt)) : g.settings.shuffleAt
+  const next: Game = { ...g, settings: { deckCount: dc, shuffleAt: sa }, updatedAt: Date.now() }
+  await store.set(next)
+  return next
+}
+
 function randomId() {
   return (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
     ? crypto.randomUUID().slice(0, 8)

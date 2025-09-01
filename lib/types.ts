@@ -13,6 +13,7 @@ export type Player = {
   value: number
   busted: boolean
   stood: boolean
+  blackjack?: boolean
   isHost?: boolean
   bet?: number
   doubled?: boolean
@@ -34,6 +35,11 @@ export type Game = {
   turnPlayerId: string | null
   updatedAt: number
   message?: string
+  settings: {
+    deckCount: number
+    shuffleAt: number
+  }
+  shoe: Card[]
 }
 
 export type ClientPlayer = Pick<Player, 'id' | 'seatId' | 'name' | 'cards' | 'value' | 'busted' | 'stood' | 'bet' | 'doubled' | 'insurance'>
@@ -48,4 +54,6 @@ export type ClientGameState = {
   isHost: boolean
   me: (ClientPlayer & { seatId: string }) | null
   message?: string
+  settings: { deckCount: number; shuffleAt: number }
+  shoeRemaining: number
 }
