@@ -26,20 +26,26 @@ export async function POST(req: NextRequest) {
     const userId = (req.headers.get('x-user-id') || body?.userId || '').toString()
     const email = (body?.email || '').toString().trim().toLowerCase()
     const username = (body?.username || '').toString().trim()
-    if (!userId || !username || !email) {
-      return Response.json({ error: 'userId, email, username required' }, { status: 400 })
-    }
+    if (!userId) return Response.json({ error: 'userId required' }, { status: 400 })
     // Check if profile exists
     const { data: exist } = await supabase.from('profiles').select('user_id').eq('user_id', userId).single()
     if (!exist) {
+      if (!email || !username) return Response.json({ error: 'email and username required to create profile' }, { status: 400 })
       const { data, error } = await supabase.from('profiles').insert({ user_id: userId, email, username, balance: 1000 }).select().single()
       if (error) throw error
       return Response.json({ ok: true, profile: data })
-    } else {
-      const { data, error } = await supabase.from('profiles').update({ email, username }).eq('user_id', userId).select().single()
-      if (error) throw error
+    }
+    // Partial update allowed
+    const patch: any = {}
+    if (email) patch.email = email
+    if (username) patch.username = username
+    if (Object.keys(patch).length === 0) {
+      const { data } = await supabase.from('profiles').select('user_id,email,username,balance').eq('user_id', userId).single()
       return Response.json({ ok: true, profile: data })
     }
+    const { data, error } = await supabase.from('profiles').update(patch).eq('user_id', userId).select().single()
+    if (error) throw error
+    return Response.json({ ok: true, profile: data })
   } catch (e: any) {
     console.error('[api/profile upsert]', e?.message || e)
     return Response.json({ error: 'internal_error' }, { status: 500 })

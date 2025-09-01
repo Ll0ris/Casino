@@ -19,7 +19,9 @@ export default function SiteHeader() {
         fetch('/api/profile/balance', { headers: { 'x-user-id': uid } }),
       ])
       const prof = await profRes.json().catch(() => ({}))
-      setUsername(prof?.username || prof?.email || '')
+      const display = prof?.username || prof?.email || ''
+      setUsername(display)
+      if (display) localStorage.setItem('displayName', display)
       const bal = await balRes.json().catch(() => ({}))
       setBalance(Number(bal?.balance || 0))
     }
