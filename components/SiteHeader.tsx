@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { getSupabaseClient } from '@/lib/supabaseClient'
 
@@ -7,6 +7,8 @@ export default function SiteHeader() {
   const router = useRouter()
   const [username, setUsername] = useState<string>('')
   const [balance, setBalance] = useState<number | null>(null)
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const uid = localStorage.getItem('authUserId')
@@ -22,6 +24,8 @@ export default function SiteHeader() {
       setBalance(Number(bal?.balance || 0))
     }
     load()
+    const t = setInterval(load, 10000)
+    return () => clearInterval(t)
   }, [])
 
   const logout = async () => {
@@ -33,17 +37,32 @@ export default function SiteHeader() {
     location.href = '/'
   }
 
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => {
+      if (!ref.current) return
+      if (!ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
   return (
-    <header className="w-full rounded-md bg-emerald-900 px-5 py-3 text-sm shadow-sm">
+    <header className="fixed left-0 right-0 top-0 z-40 w-full bg-emerald-900 text-sm shadow-sm">
       <div className="mx-auto flex max-w-6xl items-center justify-between">
         <button onClick={() => router.push('/')} className="flex items-center gap-2">
-          <img src="/assets/images/logo.png" alt="logo" className="h-8 w-8 rounded" onError={(e)=>{ (e.currentTarget as HTMLImageElement).style.display='none' }} />
+          <img src="/assets/images/logo.png" alt="logo" className="h-10 w-10 rounded" onError={(e)=>{ (e.currentTarget as HTMLImageElement).style.display='none' }} />
           <span className="text-base font-semibold tracking-wide">Virtual Casino</span>
         </button>
-        <div className="flex items-center gap-3 text-sm">
+        <div className="relative flex items-center gap-3 text-sm" ref={ref}>
           <div className="rounded-md bg-emerald-950/40 px-3 py-1.5">Bakiye: <span className="font-semibold">{balance ?? '-'}</span> $</div>
-          <button onClick={() => router.push('/profile')} className="btn-secondary"><i className="fa-solid fa-user mr-2"/>Profil</button>
-          <button onClick={logout} className="btn-secondary"><i className="fa-solid fa-arrow-right-from-bracket mr-2"/>Çıkış</button>
+          <button onClick={()=>setOpen(v=>!v)} className="btn-secondary"><i className="fa-solid fa-user mr-2"/>{username || 'Kullanıcı'}</button>
+          {open && (
+            <div className="absolute right-0 top-full mt-2 w-44 rounded-md border border-emerald-800 bg-emerald-950/95 p-1 shadow-lg">
+              <button onClick={()=>{ setOpen(false); router.push('/profile') }} className="block w-full rounded px-3 py-2 text-left hover:bg-emerald-900">Profile git</button>
+              <button onClick={()=>{ setOpen(false); router.push('/settings') }} className="block w-full rounded px-3 py-2 text-left hover:bg-emerald-900">Ayarlar</button>
+              <button onClick={()=>{ setOpen(false); logout() }} className="block w-full rounded px-3 py-2 text-left hover:bg-emerald-900 text-red-300">Çıkış yap</button>
+            </div>
+          )}
         </div>
       </div>
     </header>

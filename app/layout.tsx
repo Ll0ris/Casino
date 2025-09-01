@@ -20,10 +20,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         />
       </head>
       <body suppressHydrationWarning className="min-h-dvh text-zinc-100 antialiased">
-        <div className="mx-auto max-w-6xl px-5 py-4">
-          <SiteHeader />
-          <div className="pt-6">{children}</div>
-        </div>
+        <SiteHeader />
+        <main className="mx-auto max-w-6xl px-5 pt-6 pb-8">{children}</main>
       </body>
     </html>
   )
