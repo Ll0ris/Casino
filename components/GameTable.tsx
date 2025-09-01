@@ -44,6 +44,7 @@ export default function GameTable({
   const me = state.me
   const isMyTurn = state.turnPlayerId === me?.id
   const canDouble = state.status === 'in_round' && isMyTurn && (me?.cards?.filter((c)=>!c.hidden).length === 2) && !me?.doubled
+  const canSplit = state.status === 'in_round' && isMyTurn && (me?.cards?.filter((c)=>!c.hidden).length === 2) && (me?.cards?.[0]?.rank === me?.cards?.[1]?.rank)
   const dealerAceUp = state.dealer.cards[0] && !state.dealer.cards[0].hidden && state.dealer.cards[0].rank === 'A'
   const takeInsurance = async (amount?: number) => {
     const val = amount ?? Math.max(0, (me?.bet || 0) / 2)
@@ -74,6 +75,16 @@ export default function GameTable({
         'x-player-token': localStorage.getItem('playerToken') || '',
       },
       body: JSON.stringify({ action: 'double' })
+    })
+  }
+  const onSplit = async () => {
+    await fetch(`/api/rooms/${roomId}/action`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-player-token': localStorage.getItem('playerToken') || '',
+      },
+      body: JSON.stringify({ action: 'split' })
     })
   }
 
@@ -167,6 +178,14 @@ export default function GameTable({
                 className="rounded-md bg-amber-600 px-3 py-2 text-sm font-medium hover:bg-amber-500"
               >
                 Double Down
+              </button>
+            )}
+            {canSplit && (
+              <button
+                onClick={onSplit}
+                className="rounded-md bg-purple-600 px-3 py-2 text-sm font-medium hover:bg-purple-500"
+              >
+                Split
               </button>
             )}
           </>

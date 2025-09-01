@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Game, Player } from './types'
-import { createGame, joinGame, leaveGame, playerHit, playerStand, startRound, playerDoubleDown, computePayouts } from './game'
+import { createGame, joinGame, leaveGame, playerHit, playerStand, startRound, playerDoubleDown, computePayouts, playerSplit } from './game'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
@@ -143,9 +143,10 @@ export async function hit(roomId: string, playerToken: string) {
   const g = await store.get(roomId)
   if (!g) return null
   const tokenHash = hashToken(playerToken)
-  const me = g.players.find((p) => p.tokenHash === tokenHash)
-  if (!me) return g
-  const next = playerHit(g, me.id)
+  const currentId = g.turnPlayerId
+  const me = g.players.find((p) => p.id === currentId)
+  if (!me || me.tokenHash !== tokenHash) return g
+  const next = playerHit(g, currentId!)
   await store.set(next)
   if (next.status === 'round_over') await settleBalances(next)
   return next
@@ -156,9 +157,10 @@ export async function stand(roomId: string, playerToken: string) {
   const g = await store.get(roomId)
   if (!g) return null
   const tokenHash = hashToken(playerToken)
-  const me = g.players.find((p) => p.tokenHash === tokenHash)
-  if (!me) return g
-  const next = playerStand(g, me.id)
+  const currentId = g.turnPlayerId
+  const me = g.players.find((p) => p.id === currentId)
+  if (!me || me.tokenHash !== tokenHash) return g
+  const next = playerStand(g, currentId!)
   await store.set(next)
   if (next.status === 'round_over') await settleBalances(next)
   return next
@@ -169,11 +171,25 @@ export async function doubleDown(roomId: string, playerToken: string) {
   const g = await store.get(roomId)
   if (!g) return null
   const tokenHash = hashToken(playerToken)
-  const me = g.players.find((p) => p.tokenHash === tokenHash)
-  if (!me) return g
-  const next = playerDoubleDown(g, me.id)
+  const currentId = g.turnPlayerId
+  const me = g.players.find((p) => p.id === currentId)
+  if (!me || me.tokenHash !== tokenHash) return g
+  const next = playerDoubleDown(g, currentId!)
   await store.set(next)
   if (next.status === 'round_over') await settleBalances(next)
+  return next
+}
+
+export async function split(roomId: string, playerToken: string) {
+  const store = getStore()
+  const g = await store.get(roomId)
+  if (!g) return null
+  const tokenHash = hashToken(playerToken)
+  const currentId = g.turnPlayerId
+  const me = g.players.find((p) => p.id === currentId)
+  if (!me || me.tokenHash !== tokenHash) return g
+  const next = playerSplit(g, currentId!)
+  await store.set(next)
   return next
 }
 

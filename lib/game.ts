@@ -12,6 +12,12 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
+function uid() {
+  return (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+    ? crypto.randomUUID().slice(0, 8)
+    : Math.random().toString(36).slice(2, 10)
+}
+
 export function newDeck(): Card[] {
   const deck: Card[] = []
   for (const s of SUITS) {
@@ -172,6 +178,39 @@ export function playerDoubleDown(game: Game, playerId: string): Game {
   }
   const { dealer, msg } = dealerFinish(game.dealer, players)
   return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, updatedAt: Date.now(), message: msg }
+}
+
+export function playerSplit(game: Game, playerId: string): Game {
+  if (game.status !== 'in_round' || game.turnPlayerId !== playerId) return game
+  const idx = game.players.findIndex((p) => p.id === playerId)
+  if (idx < 0) return game
+  const players = game.players.map((p) => ({ ...p }))
+  const me = players[idx]
+  const visible = me.cards.filter((c) => !c.hidden)
+  if (visible.length !== 2) return game
+  if (visible[0].rank !== visible[1].rank) return game
+  const deck = newDeck()
+  // Create two hands
+  const first: Player = { ...me, cards: [visible[0]], doubled: false, stood: false, busted: false }
+  first.cards.push(deck.pop()!)
+  first.value = handValue(first.cards)
+  first.busted = first.value > 21
+
+  const second: Player = {
+    ...me,
+    id: uid(),
+    isHost: false,
+    cards: [visible[1]],
+    doubled: false,
+    stood: false,
+    busted: false,
+  }
+  second.cards.push(deck.pop()!)
+  second.value = handValue(second.cards)
+  second.busted = second.value > 21
+
+  players.splice(idx, 1, first, second)
+  return { ...game, players, turnPlayerId: first.id, updatedAt: Date.now() }
 }
 
 function dealerFinish(dealer: Dealer, players: Player[]) {

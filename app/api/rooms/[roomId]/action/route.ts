@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { hashToken, hit, leave, stand, doubleDown } from '@/lib/store'
+import { hashToken, hit, leave, stand, doubleDown, split } from '@/lib/store'
 import { toClient } from '@/lib/game'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +27,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   }
   if (action === 'double') {
     const g = await doubleDown(roomId, playerToken)
+    if (!g) return Response.json({ error: 'not found' }, { status: 404 })
+    return Response.json(toClient(g, hashToken(playerToken)))
+  }
+  if (action === 'split') {
+    const g = await split(roomId, playerToken)
     if (!g) return Response.json({ error: 'not found' }, { status: 404 })
     return Response.json(toClient(g, hashToken(playerToken)))
   }
