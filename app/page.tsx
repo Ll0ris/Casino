@@ -120,14 +120,15 @@ export default function HomePage() {
             <div className="grid gap-3">
               <div className="flex items-center gap-2 text-zinc-300"><i className="fa-solid fa-user-secret"/> Misafir Girişi (500$ deneme)</div>
               <input className="input" placeholder="Kullanıcı adı" value={guestName} onChange={(e)=>setGuestName(e.target.value)} />
-              <input className="input" placeholder="Oda Kodu" value={guestRoom} onChange={(e)=>setGuestRoom(e.target.value)} />
+              <input className="input" placeholder="Lobi Kodu" value={guestRoom} onChange={(e)=>setGuestRoom(e.target.value)} />
               <div className="flex gap-2">
                 <button className="btn-secondary" onClick={()=>setMode('landing')}>Geri</button>
                 <button className="btn-primary" disabled={!guestName.trim()||!guestRoom.trim()} onClick={async()=>{
                   localStorage.setItem('guestName', guestName.trim())
                   if (!localStorage.getItem('guestBalance')) localStorage.setItem('guestBalance','500')
-                  const res = await fetch(`/api/rooms/${guestRoom}/join`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken')||'' }, body: JSON.stringify({ name: guestName }) })
-                  if (res.ok) router.push(`/room/${guestRoom}`)
+                  await fetch(`/api/lobby/${guestRoom}`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken')||'' }, body: JSON.stringify({ op:'join', name: guestName }) })
+                  localStorage.setItem('lobbyId', guestRoom)
+                  router.refresh()
                 }}>Katıl</button>
               </div>
             </div>

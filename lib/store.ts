@@ -131,8 +131,11 @@ export async function createRoomWithId(roomId: string, hostName: string, playerT
 
 export async function ensureJoined(roomId: string, name: string, playerToken: string, accountId?: string, bet?: number) {
   const store = getStore()
-  const g = (await store.get(roomId))
-  if (!g) return null
+  const gAny = (await store.get(roomId)) as any
+  if (!gAny) return null
+  // If this is a lobby record (no players), do not handle here
+  if (!('players' in gAny) || !Array.isArray(gAny.players)) return null
+  const g = gAny as Game
   const tokenHash = hashToken(playerToken)
   g.lastSeen = g.lastSeen || {}
   g.lastSeen[tokenHash] = Date.now()
