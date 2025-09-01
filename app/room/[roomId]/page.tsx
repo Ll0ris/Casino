@@ -1,16 +1,22 @@
 "use client"
 import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { ClientGameState } from '@/lib/types'
+import type { ClientGameState, Game } from '@/lib/types'
 import GameTable from '@/components/GameTable'
 import { getSupabaseClient } from '@/lib/supabaseClient'
+import { toClient } from '@/lib/game'
+
+function clientHashToken(token: string) {
+  let h = 0
+  for (let i = 0; i < token.length; i++) h = (h * 31 + token.charCodeAt(i)) | 0
+  return `h${(h >>> 0)}`
+}
 
 export default function RoomPage({ params }: { params: Promise<{ roomId: string }> }) {
   const { roomId } = use(params)
   const router = useRouter()
   const [state, setState] = useState<ClientGameState | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [intervalMs, setIntervalMs] = useState(1200)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const [playerToken, setPlayerToken] = useState('')
 
@@ -27,47 +33,53 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
   }, [])
 
   const poll = async () => {
+    // Kept as a safety fallback to fetch latest sanitized state
     try {
-      const res = await fetch(`/api/rooms/${roomId}`, {
-        headers: { 'x-player-token': playerToken },
-        cache: 'no-store',
-      })
-      if (res.status === 404) {
+      const sb = getSupabaseClient()
+      const { data, error } = await sb!.from('rooms').select('state').eq('id', roomId).single()
+      if (error || !data?.state) {
         setError('Oda bulunamadı veya silindi.')
         return
       }
-      const data = (await res.json()) as ClientGameState
-      setState(data)
+      const tokenHash = clientHashToken(playerToken || '')
+      const next = toClient(data.state as Game, tokenHash)
+      setState(next)
       setError(null)
     } catch (e) {
-      setError('Ağ hatası, tekrar denenecek...')
+      setError('Ağ hatası')
     }
   }
 
   useEffect(() => {
-    // Start with one fetch for initial state
+    // Initial fetch via Supabase
     poll()
-    // Fallback polling (in case Realtime is unavailable)
-    timerRef.current = setInterval(poll, intervalMs)
-
-    // Supabase Realtime: listen table changes and refetch sanitized state
+    // Realtime subscribe to rooms row
     const sb = getSupabaseClient()
     let channel: ReturnType<NonNullable<typeof sb>['channel']> | null = null
     if (sb) {
       channel = sb
         .channel(`rooms:${roomId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, () => {
-          // Use server API to hide dealer hole card
-          poll()
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, (payload: any) => {
+          if (payload?.new?.state) {
+            const game = payload.new.state as Game
+            const tokenHash = clientHashToken(playerToken || '')
+            const next = toClient(game, tokenHash)
+            setState(next)
+            setError(null)
+          } else if (payload?.eventType === 'DELETE') {
+            setError('Oda silindi')
+          } else {
+            // fallback
+            poll()
+          }
         })
         .subscribe()
     }
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
       if (channel && sb) sb.removeChannel(channel)
+      if (timerRef.current) clearInterval(timerRef.current)
     }
-    // Recreate when deps change
-  }, [roomId, intervalMs, playerToken])
+  }, [roomId, playerToken])
 
   const onAction = async (action: 'hit' | 'stand' | 'start') => {
     if (action === 'start') {
@@ -155,18 +167,7 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
           <h1 className="text-xl font-semibold">Oda: {roomId}</h1>
           <p className="text-xs text-zinc-400">Durum: {state.status}</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-zinc-400">
-          <span>Güncelleme aralığı</span>
-          <select
-            className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1"
-            value={intervalMs}
-            onChange={(e) => setIntervalMs(parseInt(e.target.value))}
-          >
-            <option value={800}>0.8s</option>
-            <option value={1200}>1.2s</option>
-            <option value={2000}>2s</option>
-          </select>
-        </div>
+        <div className="flex items-center gap-2 text-xs text-zinc-400" />
       </div>
       {!state.me && (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
