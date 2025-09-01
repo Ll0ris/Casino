@@ -19,101 +19,6 @@ function Card({ card }: { card: { rank: string; suit: string; hidden?: boolean }
   )
 }
 
-function TableActions({
-  isHost,
-  status,
-  isMyTurn,
-  canDouble,
-  canSplit,
-  onAction,
-  onDouble,
-  onSplit,
-  dealerAceUp,
-  meBet,
-  takeInsurance,
-  intermissionUntil,
-  now,
-  roomId,
-}: {
-  isHost: boolean
-  status: ClientGameState['status']
-  isMyTurn: boolean
-  canDouble: boolean
-  canSplit: boolean
-  onAction: (action: 'hit' | 'stand' | 'start') => void
-  onDouble: () => void
-  onSplit: () => void
-  dealerAceUp: boolean
-  meBet: number
-  takeInsurance: (amount?: number) => void
-  intermissionUntil: number
-  now: number
-  roomId: string
-}) {
-  return (
-    <div className="pointer-events-none absolute left-1/2 bottom-5 z-20 -translate-x-1/2">
-      {/* Start/Restart controls for host */}
-      {isHost && (status === 'waiting' || status === 'round_over') && (
-        <div className="pointer-events-auto mb-3 flex items-center justify-center gap-2">
-          <button onClick={() => onAction('start')} className="btn-action btn-green">
-            <i className="fa-solid fa-play mr-1" /> Eli Baslat
-          </button>
-          <button
-            onClick={async () => {
-              await fetch(`/api/rooms/${roomId}/settings`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'x-player-token': localStorage.getItem('playerToken') || '' },
-                body: JSON.stringify({ autoContinue: true }),
-              })
-            }}
-            className="btn-action btn-slate"
-            title="Oto gecis"
-          >
-            <i className="fa-solid fa-rotate-right mr-1" /> Oto
-          </button>
-        </div>
-      )}
-
-      {/* Action buttons during turn */}
-      {status === 'in_round' && isMyTurn && (
-        <div className="pointer-events-auto flex items-center justify-center gap-3">
-          {canDouble && (
-            <button onClick={onDouble} className="btn-action btn-amber" title="Double">
-              <span className="font-semibold">2x</span>
-            </button>
-          )}
-          <button onClick={() => onAction('hit')} className="btn-action btn-green" title="Hit">
-            <i className="fa-solid fa-plus" />
-          </button>
-          <button onClick={() => onAction('stand')} className="btn-action btn-red" title="Stand">
-            <i className="fa-solid fa-minus" />
-          </button>
-          {canSplit && (
-            <button onClick={onSplit} className="btn-action btn-slate" title="Split">
-              <i className="fa-solid fa-code-compare rotate-90" />
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Insurance prompt */}
-      {status === 'in_round' && dealerAceUp && (
-        <div className="pointer-events-auto mt-3 flex items-center justify-center gap-2 text-sm">
-          <span className="mr-2 text-zinc-200">SIGORTA?</span>
-          <button onClick={() => takeInsurance()} className="btn-action btn-amber">
-            <i className="fa-solid fa-shield mr-1" /> EVET
-          </button>
-          <button onClick={() => takeInsurance(0)} className="btn-action btn-red">
-            <i className="fa-solid fa-shield mr-1" /> HAYIR
-          </button>
-          <span className="ml-2 rounded-full bg-emerald-500 px-2 py-0.5 text-xs font-semibold text-black">
-            {Math.max(0, Math.ceil((intermissionUntil - now) / 1000)) || ''}
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
 function suitInfo(suit: string) {
   // 6=spade, 3=heart, 4=diamond, 5=club (legacy CP437 mapping)
   switch (suit) {
@@ -207,11 +112,18 @@ export default function GameTable({
   }
 
   return (
-    <div className="relative grid gap-4 p-0">
-      {/* Header with room info removed */}
+    <div className="grid gap-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
+      <div className="flex items-center justify-between gap-2 text-xs text-zinc-400">
+        <div className="flex items-center gap-2">
+          <span>Oda ID: {state.id}</span>
+          <span>Oyuncular: {state.players.length}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <CopyButton text={`${location.origin}/room/${roomId}`} label="Davet Linki" />
+        </div>
+      </div>
 
-      {false && (
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-300">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-zinc-300">
         <div className="flex items-center gap-3">
           <div className="rounded-md border border-zinc-700/60 bg-zinc-950/40 px-2 py-1">Kalan kart: <span className="font-medium">{state.shoeRemaining}</span></div>
           <div className="rounded-md border border-zinc-700/60 bg-zinc-950/40 px-2 py-1">Deste sayısı: <span className="font-medium">{state.settings.deckCount}</span></div>
@@ -243,33 +155,15 @@ export default function GameTable({
           </div>
         )}
       </div>
-      )}
 
-      <TableView
-        roomId={roomId}
-        state={state}
-        mySeatId={mySeatId || ''}
-        onAction={onAction}
-        onDouble={onDouble}
-        onSplit={onSplit}
-        dealerAceUp={dealerAceUp}
-        meBet={me?.bet || 0}
-        takeInsurance={takeInsurance}
-        now={now}
-        isMyTurn={!!isMyTurn}
-        canDouble={!!canDouble}
-        canSplit={!!canSplit}
-      />
+      <TableView roomId={roomId} state={state} mySeatId={mySeatId || ''} />
 
-      {false && (
       <div className="grid gap-2">
         <h2 className="text-lg font-medium">Dağıtıcı</h2>
         <Hand cards={state.dealer.cards} />
         <p className="text-xs text-zinc-400">Puan: {state.dealer.value}</p>
       </div>
-      )}
 
-      {false && (
       <div className="grid gap-4">
         <h2 className="text-lg font-medium">Oyuncular</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -314,9 +208,7 @@ export default function GameTable({
           ))}
         </div>
       </div>
-      )}
 
-      {false && (
       <div className="flex flex-wrap items-center gap-2">
         {state.isHost && state.status === 'waiting' && (
           <button
@@ -373,22 +265,21 @@ export default function GameTable({
           Odadan Ayrıl
         </button>
       </div>
-      )}
 
-      {false && state.message && (
+      {state.message && (
         <div className="rounded-md border border-amber-700 bg-amber-950/40 p-3 text-sm text-amber-200">
           {state.message}
         </div>
       )}
 
-      {false && me && (state.status === 'waiting' || state.status === 'round_over') && (
+      {me && (state.status === 'waiting' || state.status === 'round_over') && (
         <div className="flex items-center gap-2 text-sm text-zinc-300">
           <span>Bahisin:</span>
           <input
             type="number"
             min={0}
             step={1}
-            defaultValue={me?.bet ?? 0}
+            defaultValue={me.bet ?? 0}
             onBlur={(e) => setBet(parseInt(e.target.value || '0'))}
             className="w-24 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 outline-none focus:border-zinc-600"
           />
@@ -396,17 +287,17 @@ export default function GameTable({
         </div>
       )}
 
-      {false && me && state.status === 'in_round' && dealerAceUp && !(me?.insurance) && (
+      {me && state.status === 'in_round' && dealerAceUp && !me.insurance && (
         <div className="flex flex-wrap items-center gap-2 text-sm text-amber-300">
           <span>Insurance mevcut (Dealer Ace).</span>
           <button onClick={()=>takeInsurance()} className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium hover:bg-amber-500">Yarım Bet Al</button>
-          <span className="text-xs text-amber-200/80">(Max: {(me?.bet||0)/2})</span>
+          <span className="text-xs text-amber-200/80">(Max: {(me.bet||0)/2})</span>
         </div>
       )}
 
-      {false && state.status === 'round_over' && state.intermissionUntil && (
+      {state.status === 'round_over' && state.intermissionUntil && (
         <div className="text-center text-sm text-zinc-300">
-          Yeni el {Math.max(0, Math.ceil((((state.intermissionUntil)||0) - now)/1000))}s içinde başlayacak
+          Yeni el {Math.max(0, Math.ceil((state.intermissionUntil - now)/1000))}s içinde başlayacak
         </div>
       )}
 
@@ -416,35 +307,7 @@ export default function GameTable({
   )
 }
 
-function TableView({
-  roomId,
-  state,
-  mySeatId,
-  onAction,
-  onDouble,
-  onSplit,
-  dealerAceUp,
-  meBet,
-  takeInsurance,
-  now,
-  isMyTurn,
-  canDouble,
-  canSplit,
-}: {
-  roomId: string
-  state: ClientGameState
-  mySeatId: string
-  onAction: (action: 'hit' | 'stand' | 'start') => void
-  onDouble: () => void
-  onSplit: () => void
-  dealerAceUp: boolean
-  meBet: number
-  takeInsurance: (amount?: number) => void
-  now: number
-  isMyTurn: boolean
-  canDouble: boolean
-  canSplit: boolean
-}) {
+function TableView({ roomId, state, mySeatId }: { roomId: string; state: ClientGameState; mySeatId: string }) {
   const seats = useMemo(() => {
     const map: Record<string, { seatId: string; name: string }> = {}
     for (const p of state.players) {
@@ -457,10 +320,8 @@ function TableView({
   const lefts = [8, 22, 36, 50, 64, 78, 92]
   const spots = Array.from({ length: maxSpots }).map((_, i) => seats[i] || null)
 
-  const currentHand = state.players.find((p) => p.id === state.turnPlayerId) || null
-  const isMyTurnLocal = Boolean(currentHand && mySeatId && currentHand.seatId === mySeatId)
   return (
-    <div className="relative isolate h-[60vh] sm:h-[65vh] lg:h-[70vh] xl:h-[75vh] w-full overflow-hidden rounded-xl border border-teal-900/60 bg-gradient-to-b from-teal-800 to-teal-700">
+    <div className="relative isolate h-[420px] w-full overflow-hidden rounded-xl border border-teal-900/60 bg-gradient-to-b from-teal-800 to-teal-700">
       <div className="absolute inset-x-0 bottom-0 h-[320px] rounded-t-[36px] rounded-b-[240px] bg-teal-700 shadow-[inset_0_20px_60px_rgba(0,0,0,0.35)]" />
 
       {/* Lounge label */}
@@ -468,10 +329,9 @@ function TableView({
         {(state.hostName || 'Player') + "'s Lounge"}
       </div>
 
-      {/* Dealer hand in the upper center */}
-      <div className="absolute left-1/2 top-10 -translate-x-1/2 text-center">
-        <Hand cards={state.dealer.cards} />
-        <div className="mt-1 text-xs text-zinc-100">Puan: {state.dealer.value}</div>
+      {/* Scoreboard in table (top-left) */}
+      <div className="absolute left-4 top-4">
+        <Scoreboard roomId={roomId} mySeatId={mySeatId} refreshKey={state.intermissionUntil || state.turnPlayerId || 0} />
       </div>
 
       {/* Shoe on right */}
@@ -485,25 +345,15 @@ function TableView({
         </div>
       </div>
 
-      {/* 7 betting spots with simple on-table hands */}
-      {spots.map((seat, i) => {
-        const px = lefts[i]
-        const hand = seat ? state.players.find((p) => p.seatId === seat.seatId) : null
-        const isTurn = hand && hand.id === state.turnPlayerId && state.status === 'in_round'
-        return (
-          <div key={i} className="absolute -translate-x-1/2" style={{ left: `${px}%`, bottom: 36 }}>
-            <div className={clsx('h-14 w-14 rounded-full border-2', isTurn ? 'border-amber-400 shadow-[0_0_0_4px_rgba(251,191,36,0.25)]' : seat ? 'border-black/70' : 'border-black/40', 'bg-transparent')} />
-            <div className={clsx('mt-1 w-24 -translate-x-1/2 text-center text-xs', 'relative left-1/2', seat && mySeatId === seat.seatId ? 'font-semibold text-emerald-200' : 'text-zinc-100')}>
-              {seat ? seat.name : `#${i + 1}`}
-            </div>
-            {hand && (
-              <div className="relative left-1/2 -translate-x-1/2 translate-y-[-54px]">
-                <Hand cards={hand.cards} />
-              </div>
-            )}
+      {/* 7 betting spots */}
+      {spots.map((seat, i) => (
+        <div key={i} className="absolute -translate-x-1/2" style={{ left: `${lefts[i]}%`, bottom: 36 }}>
+          <div className={clsx('h-14 w-14 rounded-full border-2', seat ? 'border-black/70' : 'border-black/40', 'bg-transparent shadow-[inset_0_0_0_2px_rgba(0,0,0,0.15)]')} />
+          <div className={clsx('mt-1 w-20 -translate-x-1/2 text-center text-xs', 'relative left-1/2', seat && mySeatId === seat.seatId ? 'font-semibold text-emerald-200' : 'text-zinc-100')}>
+            {seat ? seat.name : `#${i + 1}`}
           </div>
-        )
-      })}
+        </div>
+      ))}
 
       {/* Host controls */}
       {state.isHost && (
@@ -548,23 +398,6 @@ function TableView({
           </label>
         </div>
       )}
-      {/* Action bar over table bottom center */}
-      <TableActions
-        isHost={Boolean(state.isHost)}
-        status={state.status}
-        isMyTurn={isMyTurnLocal}
-        canDouble={canDouble}
-        canSplit={canSplit}
-        onAction={onAction}
-        onDouble={onDouble}
-        onSplit={onSplit}
-        dealerAceUp={dealerAceUp}
-        meBet={meBet}
-        takeInsurance={takeInsurance}
-        intermissionUntil={state.intermissionUntil || 0}
-        now={now}
-        roomId={roomId}
-      />
     </div>
   )
 }
@@ -588,4 +421,31 @@ function MyBalance({ roomId, mySeatId, refreshKey }: { roomId: string; mySeatId:
   )
 }
 
-// Scoreboard moved to a floating panel on RoomPage
+function Scoreboard({ roomId, mySeatId, refreshKey }: { roomId: string; mySeatId: string; refreshKey: number|string }) {
+  const [items, setItems] = useState<Array<{ seatId: string; name: string; balance: number }>>([])
+  useEffect(()=>{
+    const load = async ()=>{
+      const res = await fetch(`/api/rooms/${roomId}/balances`, { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      const arr = (data?.items||[]).sort((a:any,b:any)=> (b.balance||0)-(a.balance||0))
+      setItems(arr)
+    }
+    load()
+  },[roomId, refreshKey])
+  const top = items[0]
+  return (
+    <div className="rounded-md border border-zinc-700/60 bg-zinc-950/70 p-2 text-xs text-zinc-300">
+      <div className="mb-1 text-zinc-400">Skor Tablosu</div>
+      {items.length === 0 ? <div>—</div> : (
+        <div className="flex items-center gap-3">
+          {items.map((x)=> (
+            <div key={x.seatId} className={x.seatId===mySeatId? 'font-semibold text-emerald-300':'text-zinc-300'}>
+              {x.name}: {x.balance ?? 0}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

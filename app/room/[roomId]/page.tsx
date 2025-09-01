@@ -3,6 +3,7 @@ import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { ClientGameState, Game } from '@/lib/types'
 import GameTable from '@/components/GameTable'
+import Scoreboard from '@/components/Scoreboard'
 import { getSupabaseClient } from '@/lib/supabaseClient'
 import { toClient } from '@/lib/game'
 
@@ -195,8 +196,7 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
     <main className="grid gap-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Oda: {roomId}</h1>
-          <p className="text-xs text-zinc-400">Durum: {state.status}</p>
+          {/* Oda bilgisi gizlendi */}
         </div>
         <div className="flex items-center gap-2 text-xs text-zinc-400" />
       </div>
@@ -229,6 +229,11 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
           </div>
         </div>
       )}
+      {/* Full-bleed scoreboard fixed on the top-right */}
+      <div className="fixed right-5 top-24 z-40">
+        <Scoreboard roomId={roomId} mySeatId={state.me?.seatId || ''} refreshKey={state.intermissionUntil || state.turnPlayerId || 0} />
+      </div>
+
       <GameTable roomId={roomId} state={state} onAction={onAction} onLeave={onLeave} />
     </main>
   )
