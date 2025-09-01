@@ -3,6 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import CopyButton from '@/components/CopyButton'
 import { getSupabaseClient } from '@/lib/supabaseClient'
 
+function hashToken(token: string) {
+  let h = 0
+  for (let i = 0; i < token.length; i++) h = (h * 31 + token.charCodeAt(i)) | 0
+  return `h${(h >>> 0)}`
+}
+
 export default function LobbyPanel() {
   const [lobbyId, setLobbyId] = useState<string | null>(null)
   const [state, setState] = useState<any>(null)
@@ -101,7 +107,7 @@ export default function LobbyPanel() {
                 ))}
               </div>
             </div>
-            {state?.hostTokenHash === (token && ('h'+(Array.from(token).reduce((a,c)=> (a*31+c.charCodeAt(0))|0,0)>>>0))) && (
+            {state?.hostTokenHash === hashToken(token) && (
               <button onClick={startBlackjack} className="rounded bg-emerald-600 px-3 py-2 text-xs">Blackjack ile başlat</button>
             )}
             {state && !lobbyId && (
@@ -113,4 +119,3 @@ export default function LobbyPanel() {
     </div>
   )
 }
-

@@ -26,7 +26,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lob
 
   if (op === 'join') {
     const exists = state.participants?.some((p: any) => p.tokenHash === tokenHash)
-    if (!exists) state.participants = [...(state.participants||[]), { name: body?.name || 'Player', tokenHash, userId }]
+    let name = (body?.name || '').toString()
+    if (!name && userId) {
+      const { data: prof } = await sb.from('profiles').select('username,email').eq('user_id', userId).single()
+      name = (prof?.username || (prof?.email ? (prof!.email as string).split('@')[0] : '') || 'Player') as string
+    }
+    if (!exists) state.participants = [...(state.participants||[]), { name: name || 'Player', tokenHash, userId }]
     await sb.from('rooms').upsert({ id: lobbyId, state })
     return Response.json(state)
   }
@@ -51,4 +56,3 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lob
   }
   return Response.json({ error: 'unsupported' }, { status: 400 })
 }
-
