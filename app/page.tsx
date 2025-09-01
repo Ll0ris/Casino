@@ -29,8 +29,7 @@ export default function HomePage() {
   }, [])
 
   const onCreate = async () => {
-    const name = username || localStorage.getItem('guestName') || ''
-    if (!name) return
+    const name = (username || localStorage.getItem('guestName') || '').toString().trim() || `Player-${(localStorage.getItem('playerToken')||'').slice(0,4)}`
     try {
       setBusy(true); setErr(null)
       const res = await fetch('/api/rooms', {
@@ -162,4 +161,3 @@ function GameCard({ label, emoji, onClick, disabled }: { label: string; emoji: s
     </button>
   )
 }
-

@@ -25,6 +25,9 @@ export default function SiteHeader() {
     }
     load()
     const t = setInterval(load, 10000)
+    const hb = setInterval(() => {
+      fetch('/api/profile/heartbeat', { method: 'POST', headers: { 'x-user-id': uid } })
+    }, 60000)
     return () => clearInterval(t)
   }, [])
 
