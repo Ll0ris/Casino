@@ -15,15 +15,19 @@ export async function POST(req: NextRequest) {
     if (!userId || !username || !email) {
       return Response.json({ error: 'userId, email, username required' }, { status: 400 })
     }
-    const { data, error } = await supabase.from('profiles').upsert(
-      { user_id: userId, email, username },
-      { onConflict: 'user_id' }
-    ).select().single()
-    if (error) throw error
-    return Response.json({ ok: true, profile: data })
+    // Check if profile exists
+    const { data: exist } = await supabase.from('profiles').select('user_id').eq('user_id', userId).single()
+    if (!exist) {
+      const { data, error } = await supabase.from('profiles').insert({ user_id: userId, email, username, balance: 1000 }).select().single()
+      if (error) throw error
+      return Response.json({ ok: true, profile: data })
+    } else {
+      const { data, error } = await supabase.from('profiles').update({ email, username }).eq('user_id', userId).select().single()
+      if (error) throw error
+      return Response.json({ ok: true, profile: data })
+    }
   } catch (e: any) {
     console.error('[api/profile upsert]', e?.message || e)
     return Response.json({ error: 'internal_error' }, { status: 500 })
   }
 }
-

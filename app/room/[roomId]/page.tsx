@@ -86,7 +86,7 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
   // Heartbeat + timeout tick
   useEffect(() => {
     if (!playerToken) return
-    const heartbeat = () => fetch(`/api/rooms/${roomId}/heartbeat`, { method: 'POST', headers: { 'x-player-token': playerToken } })
+    const heartbeat = () => fetch(`/api/rooms/${roomId}/heartbeat`, { method: 'POST', headers: { 'x-player-token': playerToken, 'x-user-id': localStorage.getItem('authUserId') || '' } })
     const hb = setInterval(heartbeat, 8000)
     heartbeat()
     const tick = () => {

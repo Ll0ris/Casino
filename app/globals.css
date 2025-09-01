@@ -3,13 +3,14 @@
 @tailwind utilities;
 
 :root {
-  --bg: 16 24 32;
+  --bg: 9 35 20; /* casino green base */
 }
 
-/* Subtle gradient + grid dots background */
+/* Casino green gradient */
 body {
-  background: radial-gradient(1200px 600px at 80% -10%, rgba(16,185,129,0.12), transparent 60%),
-              radial-gradient(1000px 500px at -10% 10%, rgba(59,130,246,0.10), transparent 60%),
+  background: radial-gradient(1200px 600px at 80% -10%, rgba(16,185,129,0.18), transparent 60%),
+              radial-gradient(900px 500px at 10% 10%, rgba(34,197,94,0.15), transparent 60%),
+              linear-gradient(180deg, rgba(6,78,59,0.6), rgba(10,40,24,0.9)),
               rgb(var(--bg));
 }
 

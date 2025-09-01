@@ -20,6 +20,7 @@ create table if not exists public.profiles (
   email text not null,
   username text unique not null,
   balance numeric not null default 0,
+  last_topup_at timestamp with time zone default now(),
   created_at timestamp with time zone default now(),
   updated_at timestamp with time zone default now()
 );
@@ -28,4 +29,3 @@ create index if not exists profiles_username_idx on public.profiles (username);
 
 -- Keep it simple: disable RLS for this prototype (or add permissive policies if you enable RLS)
 alter table public.profiles disable row level security;
-
