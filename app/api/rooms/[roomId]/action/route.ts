@@ -12,7 +12,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   try {
     const body = await req.json().catch(() => ({}))
     const action = String(body?.action || '')
-    const playerToken = req.headers.get('x-player-token') || ''
+    // Accept token from header (normal fetch) or body (sendBeacon fallback)
+    const playerToken = req.headers.get('x-player-token') || String((body as any)?.playerToken || '')
     if (!playerToken) return Response.json({ error: 'token required' }, { status: 400 })
     const { roomId } = await params
     if (action === 'hit') {

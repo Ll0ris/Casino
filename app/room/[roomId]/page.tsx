@@ -103,7 +103,11 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
     }
     timeoutRef.current = setInterval(tick, 1000)
     const handleUnload = () => {
-      navigator.sendBeacon(`/api/rooms/${roomId}/action`, new Blob([JSON.stringify({ action: 'leave' })], { type: 'application/json' }))
+      // Include token in body for sendBeacon (no headers possible)
+      navigator.sendBeacon(
+        `/api/rooms/${roomId}/action`,
+        new Blob([JSON.stringify({ action: 'leave', playerToken })], { type: 'application/json' })
+      )
     }
     window.addEventListener('beforeunload', handleUnload)
     return () => {

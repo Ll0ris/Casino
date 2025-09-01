@@ -5,15 +5,15 @@ import clsx from 'clsx'
 
 function Card({ card }: { card: { rank: string; suit: string; hidden?: boolean } }) {
   if (card.hidden) {
-    return <div className="h-14 w-10 rounded-md border border-zinc-800 bg-zinc-800" />
+    return <div className="h-16 w-12 rounded-xl border border-zinc-700/70 bg-zinc-700/70 shadow" />
   }
   const info = suitInfo(card.suit)
-  const red = info.color.includes('red')
+  const isRed = info.name === 'heart' || info.name === 'diamond'
   return (
-    <div className="grid h-14 w-10 place-items-center rounded-md border border-zinc-800 bg-zinc-900 text-sm">
-      <span className={clsx('flex items-center', red ? 'text-red-300' : 'text-zinc-200')}>
+    <div className="grid h-16 w-12 place-items-center rounded-xl border border-zinc-300 bg-white text-sm shadow-lg shadow-black/30">
+      <span className={clsx('flex items-center font-semibold', isRed ? 'text-red-600' : 'text-black')}>
         {card.rank}
-        <i className={clsx('ml-1 text-xs', 'fa-solid', info.icon)} />
+        <i className={clsx('ml-1 text-sm', 'fa-solid', info.icon, isRed ? 'text-red-600' : 'text-black')} />
       </span>
     </div>
   )
@@ -30,8 +30,9 @@ function TableActions({
   onSplit,
   dealerAceUp,
   meBet,
+  hasInsurance,
   takeInsurance,
-  intermissionUntil,
+  turnExpiresAt,
   now,
   roomId,
 }: {
@@ -45,13 +46,15 @@ function TableActions({
   onSplit: () => void
   dealerAceUp: boolean
   meBet: number
+  hasInsurance?: boolean
   takeInsurance: (amount?: number) => void
-  intermissionUntil: number
+  turnExpiresAt?: number | null
   now: number
   roomId: string
 }) {
+  const secs = status === 'in_round' && turnExpiresAt ? Math.max(0, Math.ceil((turnExpiresAt - now) / 1000)) : null
   return (
-    <div className="pointer-events-none absolute left-1/2 bottom-5 z-20 -translate-x-1/2">
+    <div className="pointer-events-none fixed left-1/2 bottom-6 z-40 -translate-x-1/2 w-[min(92vw,860px)]">
       {/* Start/Restart controls for host */}
       {isHost && (status === 'waiting' || status === 'round_over') && (
         <div className="pointer-events-auto mb-3 flex items-center justify-center gap-2">
@@ -76,7 +79,7 @@ function TableActions({
 
       {/* Action buttons during turn */}
       {status === 'in_round' && isMyTurn && (
-        <div className="pointer-events-auto flex items-center justify-center gap-3">
+        <div className="pointer-events-auto mx-auto flex items-center justify-center gap-3 rounded-2xl border border-emerald-900/50 bg-zinc-950/70 p-2 shadow-lg">
           {canDouble && (
             <button onClick={onDouble} className="btn-action btn-amber" title="Double">
               <span className="font-semibold">2x</span>
@@ -96,19 +99,27 @@ function TableActions({
         </div>
       )}
 
-      {/* Insurance prompt */}
-      {status === 'in_round' && dealerAceUp && (
-        <div className="pointer-events-auto mt-3 flex items-center justify-center gap-2 text-sm">
-          <span className="mr-2 text-zinc-200">SIGORTA?</span>
-          <button onClick={() => takeInsurance()} className="btn-action btn-amber">
-            <i className="fa-solid fa-shield mr-1" /> EVET
-          </button>
-          <button onClick={() => takeInsurance(0)} className="btn-action btn-red">
-            <i className="fa-solid fa-shield mr-1" /> HAYIR
-          </button>
-          <span className="ml-2 rounded-full bg-emerald-500 px-2 py-0.5 text-xs font-semibold text-black">
-            {Math.max(0, Math.ceil((intermissionUntil - now) / 1000)) || ''}
-          </span>
+      {/* Insurance prompt as separate bottom panel */}
+      {status === 'in_round' && dealerAceUp && !hasInsurance && (
+        <div className="pointer-events-auto mt-2 rounded-2xl border border-emerald-900/50 bg-zinc-950/70 p-3 text-sm shadow-lg">
+          <div className="mb-2 text-center text-zinc-200">SIGORTA?</div>
+          <div className="flex items-center justify-center gap-2">
+            <button onClick={() => takeInsurance()} className="btn-action btn-amber">
+              <i className="fa-solid fa-shield mr-1" /> EVET
+            </button>
+            <button onClick={() => takeInsurance(0)} className="btn-action btn-red">
+              <i className="fa-solid fa-shield mr-1" /> HAYIR
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Turn timer bar */}
+      {status === 'in_round' && (
+        <div className="pointer-events-none mt-2 h-1 w-full rounded bg-emerald-500/80">
+          <div className="relative -top-2 left-1/2 h-6 w-6 -translate-x-1/2 rounded-full bg-emerald-500 text-center text-[11px] font-bold leading-6 text-black ring-2 ring-emerald-700">
+            {secs ?? ''}
+          </div>
         </div>
       )}
     </div>
@@ -118,14 +129,14 @@ function suitInfo(suit: string) {
   // 6=spade, 3=heart, 4=diamond, 5=club (legacy CP437 mapping)
   switch (suit) {
     case '\u0003':
-      return { icon: 'fa-suit-heart', color: 'text-red-400' }
+      return { icon: 'fa-suit-heart', name: 'heart' }
     case '\u0004':
-      return { icon: 'fa-suit-diamond', color: 'text-red-400' }
+      return { icon: 'fa-suit-diamond', name: 'diamond' }
     case '\u0005':
-      return { icon: 'fa-suit-club', color: 'text-zinc-200' }
+      return { icon: 'fa-suit-club', name: 'club' }
     case '\u0006':
     default:
-      return { icon: 'fa-suit-spade', color: 'text-zinc-200' }
+      return { icon: 'fa-suit-spade', name: 'spade' }
   }
 }
 
@@ -205,9 +216,10 @@ export default function GameTable({
       body: JSON.stringify({ action: 'split' })
     })
   }
+  const [showSettings, setShowSettings] = useState(false)
 
   return (
-    <div className="relative grid gap-4 p-0">
+    <div className="relative grid gap-4 p-0 w-[80vw] max-w-[1700px] left-1/2 -translate-x-1/2">
       {/* Header with room info removed */}
 
       {false && (
@@ -412,6 +424,53 @@ export default function GameTable({
 
       {/* Bottom-left my balance */}
       <MyBalance roomId={roomId} mySeatId={me?.seatId || ''} refreshKey={state.intermissionUntil || state.turnPlayerId || 0} />
+
+      {/* Host-only settings button + modal */}
+      {state.isHost && (
+        <>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="fixed right-6 bottom-6 z-40 btn-secondary px-4 py-2"
+          >
+            Oda Ayarlari
+          </button>
+          {showSettings && (
+            <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+              <div className="w-[min(92vw,520px)] rounded-2xl border border-zinc-700/60 bg-zinc-900/90 p-4 shadow-xl">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="text-sm font-semibold text-zinc-200">Oda Ayarlari</div>
+                  <button onClick={()=>setShowSettings(false)} className="btn btn-secondary px-2 py-1 text-xs">Kapat</button>
+                </div>
+                <div className="grid gap-4 text-sm text-zinc-300">
+                  <label className="grid gap-1">
+                    <span className="text-xs text-zinc-400">Deste sayisi: {state.settings.deckCount}</span>
+                    <input
+                      type="range"
+                      min={1}
+                      max={6}
+                      defaultValue={state.settings.deckCount}
+                      onChange={async (e)=>{
+                        const v = Number(e.target.value||'1')
+                        await fetch(`/api/rooms/${roomId}/settings`, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'x-player-token': localStorage.getItem('playerToken') || '' },
+                          body: JSON.stringify({ deckCount: v, shuffleAt: 35, autoContinue: state.settings?.autoContinue ?? true })
+                        })
+                      }}
+                    />
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" defaultChecked={(state.settings as any).autoContinue ?? true} onChange={async(e)=>{
+                      await fetch(`/api/rooms/${roomId}/settings`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken') || '' }, body: JSON.stringify({ autoContinue: e.target.checked }) })
+                    }} />
+                    <span>Oto gecis</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -460,16 +519,24 @@ function TableView({
   const currentHand = state.players.find((p) => p.id === state.turnPlayerId) || null
   const isMyTurnLocal = Boolean(currentHand && mySeatId && currentHand.seatId === mySeatId)
   return (
-    <div className="relative isolate h-[60vh] sm:h-[65vh] lg:h-[70vh] xl:h-[75vh] w-full overflow-hidden rounded-xl border border-teal-900/60 bg-gradient-to-b from-teal-800 to-teal-700">
+    <div className="relative isolate h-[60vh] sm:h-[65vh] lg:h-[70vh] xl:h-[75vh] w-full overflow-hidden rounded-[36px] border border-teal-900/60 bg-gradient-to-b from-teal-800 to-teal-700">
       <div className="absolute inset-x-0 bottom-0 h-[320px] rounded-t-[36px] rounded-b-[240px] bg-teal-700 shadow-[inset_0_20px_60px_rgba(0,0,0,0.35)]" />
 
       {/* Lounge label */}
-      <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full border border-black/30 bg-teal-600/70 px-4 py-1 text-sm font-medium text-zinc-100 shadow">
+      <div className="absolute left-1/2 top-12 -translate-x-1/2 rounded-full border border-black/30 bg-teal-600/70 px-4 py-1 text-sm font-medium text-zinc-100 shadow">
         {(state.hostName || 'Player') + "'s Lounge"}
       </div>
 
+      {/* Felt texts */}
+      <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 text-[11px] font-semibold tracking-widest text-emerald-100/90">
+        BLACKJACK PAYS 3 TO 2
+      </div>
+      <div className="pointer-events-none absolute left-1/2 top-8 -translate-x-1/2 text-[10px] tracking-wider text-emerald-100/80">
+        DEALER MUST DRAW TO 16 AND STAND ON ALL 17s
+      </div>
+
       {/* Dealer hand in the upper center */}
-      <div className="absolute left-1/2 top-10 -translate-x-1/2 text-center">
+      <div className="absolute left-1/2 top-20 -translate-x-1/2 text-center">
         <Hand cards={state.dealer.cards} />
         <div className="mt-1 text-xs text-zinc-100">Puan: {state.dealer.value}</div>
       </div>
@@ -560,8 +627,9 @@ function TableView({
         onSplit={onSplit}
         dealerAceUp={dealerAceUp}
         meBet={meBet}
+        hasInsurance={Boolean((state as any).me?.insurance)}
         takeInsurance={takeInsurance}
-        intermissionUntil={state.intermissionUntil || 0}
+        turnExpiresAt={(state as any).turnExpiresAt || 0}
         now={now}
         roomId={roomId}
       />
