@@ -1,22 +1,37 @@
 "use client"
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ClientGameState } from '@/lib/types'
 import clsx from 'clsx'
 
 function Card({ card }: { card: { rank: string; suit: string; hidden?: boolean } }) {
   if (card.hidden) {
-    return (
-      <div className="h-14 w-10 rounded-md border border-zinc-800 bg-zinc-800" />
-    )
+    return <div className="h-14 w-10 rounded-md border border-zinc-800 bg-zinc-800" />
   }
+  const info = suitInfo(card.suit)
+  const red = info.color.includes('red')
   return (
     <div className="grid h-14 w-10 place-items-center rounded-md border border-zinc-800 bg-zinc-900 text-sm">
-      <span>
+      <span className={clsx('flex items-center', red ? 'text-red-300' : 'text-zinc-200')}>
         {card.rank}
-        <span className="ml-0.5 text-xs opacity-70">{card.suit}</span>
+        <i className={clsx('ml-1 text-xs', 'fa-solid', info.icon)} />
       </span>
     </div>
   )
+}
+
+function suitInfo(suit: string) {
+  // 6=spade, 3=heart, 4=diamond, 5=club (legacy CP437 mapping)
+  switch (suit) {
+    case '\u0003':
+      return { icon: 'fa-suit-heart', color: 'text-red-400' }
+    case '\u0004':
+      return { icon: 'fa-suit-diamond', color: 'text-red-400' }
+    case '\u0005':
+      return { icon: 'fa-suit-club', color: 'text-zinc-200' }
+    case '\u0006':
+    default:
+      return { icon: 'fa-suit-spade', color: 'text-zinc-200' }
+  }
 }
 
 function Hand({ cards }: { cards: Array<{ rank: string; suit: string; hidden?: boolean }> }) {
@@ -113,10 +128,7 @@ export default function GameTable({
           <div className="rounded-md border border-zinc-700/60 bg-zinc-950/40 px-2 py-1">Kalan kart: <span className="font-medium">{state.shoeRemaining}</span></div>
           <div className="rounded-md border border-zinc-700/60 bg-zinc-950/40 px-2 py-1">Deste sayısı: <span className="font-medium">{state.settings.deckCount}</span></div>
         </div>
-        <div className="ml-auto flex items-center gap-3">
-          {/* Scoreboard */}
-          <Scoreboard roomId={roomId} mySeatId={me?.seatId || ''} refreshKey={state.intermissionUntil || state.turnPlayerId || 0} />
-        </div>
+        <div className="ml-auto" />
         {state.isHost && (
           <div className="flex items-center gap-2">
             <span className="text-zinc-400">Deste</span>
@@ -143,6 +155,9 @@ export default function GameTable({
           </div>
         )}
       </div>
+
+      <TableView roomId={roomId} state={state} mySeatId={mySeatId || ''} />
+
       <div className="grid gap-2">
         <h2 className="text-lg font-medium">Dağıtıcı</h2>
         <Hand cards={state.dealer.cards} />
@@ -288,6 +303,101 @@ export default function GameTable({
 
       {/* Bottom-left my balance */}
       <MyBalance roomId={roomId} mySeatId={me?.seatId || ''} refreshKey={state.intermissionUntil || state.turnPlayerId || 0} />
+    </div>
+  )
+}
+
+function TableView({ roomId, state, mySeatId }: { roomId: string; state: ClientGameState; mySeatId: string }) {
+  const seats = useMemo(() => {
+    const map: Record<string, { seatId: string; name: string }> = {}
+    for (const p of state.players) {
+      if (!map[p.seatId]) map[p.seatId] = { seatId: p.seatId, name: p.name }
+    }
+    return Object.values(map)
+  }, [state.players])
+
+  const maxSpots = 7
+  const lefts = [8, 22, 36, 50, 64, 78, 92]
+  const spots = Array.from({ length: maxSpots }).map((_, i) => seats[i] || null)
+
+  return (
+    <div className="relative isolate h-[420px] w-full overflow-hidden rounded-xl border border-teal-900/60 bg-gradient-to-b from-teal-800 to-teal-700">
+      <div className="absolute inset-x-0 bottom-0 h-[320px] rounded-t-[36px] rounded-b-[240px] bg-teal-700 shadow-[inset_0_20px_60px_rgba(0,0,0,0.35)]" />
+
+      {/* Lounge label */}
+      <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full border border-black/30 bg-teal-600/70 px-4 py-1 text-sm font-medium text-zinc-100 shadow">
+        {(state.hostName || 'Player') + "'s Lounge"}
+      </div>
+
+      {/* Scoreboard in table (top-left) */}
+      <div className="absolute left-4 top-4">
+        <Scoreboard roomId={roomId} mySeatId={mySeatId} refreshKey={state.intermissionUntil || state.turnPlayerId || 0} />
+      </div>
+
+      {/* Shoe on right */}
+      <div className="absolute right-8 top-24 flex flex-col items-center gap-2">
+        <div className="relative h-24 w-16">
+          <div className="absolute left-2 top-2 h-24 w-14 rotate-3 rounded-md border border-zinc-800 bg-zinc-900" />
+          <div className="absolute left-0 top-0 h-24 w-14 -rotate-3 rounded-md border border-zinc-700 bg-zinc-800" />
+        </div>
+        <div className="rounded-md border border-zinc-700/60 bg-zinc-950/60 px-2 py-1 text-xs text-zinc-200">
+          Kart: <span className="font-semibold">{state.shoeRemaining}</span>
+        </div>
+      </div>
+
+      {/* 7 betting spots */}
+      {spots.map((seat, i) => (
+        <div key={i} className="absolute -translate-x-1/2" style={{ left: `${lefts[i]}%`, bottom: 36 }}>
+          <div className={clsx('h-14 w-14 rounded-full border-2', seat ? 'border-black/70' : 'border-black/40', 'bg-transparent shadow-[inset_0_0_0_2px_rgba(0,0,0,0.15)]')} />
+          <div className={clsx('mt-1 w-20 -translate-x-1/2 text-center text-xs', 'relative left-1/2', seat && mySeatId === seat.seatId ? 'font-semibold text-emerald-200' : 'text-zinc-100')}>
+            {seat ? seat.name : `#${i + 1}`}
+          </div>
+        </div>
+      ))}
+
+      {/* Host controls */}
+      {state.isHost && (
+        <div className="absolute bottom-4 left-4 flex items-center gap-3 text-xs text-zinc-200">
+          <div className="rounded-md border border-zinc-700/60 bg-zinc-950/40 px-2 py-1">
+            Deste sayisi: <span className="font-medium">{state.settings.deckCount}</span>
+          </div>
+          <input
+            title="Deste sayisi"
+            type="range"
+            min={1}
+            max={6}
+            defaultValue={state.settings.deckCount}
+            onChange={async (e) => {
+              const v = Number(e.target.value || '1')
+              await fetch(`/api/rooms/${roomId}/settings`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-player-token': localStorage.getItem('playerToken') || '',
+                },
+                body: JSON.stringify({ deckCount: v, shuffleAt: 35, autoContinue: state.settings?.autoContinue ?? true }),
+              })
+            }}
+          />
+          <label className="ml-1 flex items-center gap-1">
+            <input
+              type="checkbox"
+              defaultChecked={(state.settings as any).autoContinue ?? true}
+              onChange={async (e) => {
+                await fetch(`/api/rooms/${roomId}/settings`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-player-token': localStorage.getItem('playerToken') || '',
+                  },
+                  body: JSON.stringify({ autoContinue: e.target.checked }),
+                })
+              }}
+            />
+            <span>Oto gecis</span>
+          </label>
+        </div>
+      )}
     </div>
   )
 }

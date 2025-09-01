@@ -62,6 +62,7 @@ export type ClientGameState = {
   settings: { deckCount: number; shuffleAt: number; autoContinue?: boolean }
   shoeRemaining: number
   intermissionUntil?: number | null
+  hostName?: string | null
 }
 
 // Simple lobby state persisted in rooms.state before a game starts

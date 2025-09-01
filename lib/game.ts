@@ -354,6 +354,7 @@ export function toClient(game: Game, tokenHash: string) {
 
   const me = game.players.find((p) => p.tokenHash === tokenHash) || null
 
+  const hostName = game.players.find((p) => p.isHost)?.name || null
   return {
     id: game.id,
     players: game.players.map((p) => ({
@@ -391,5 +392,6 @@ export function toClient(game: Game, tokenHash: string) {
     settings: game.settings,
     shoeRemaining: game.shoe.length,
     intermissionUntil: game.intermissionUntil || null,
+    hostName,
   }
 }
