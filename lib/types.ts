@@ -63,3 +63,13 @@ export type ClientGameState = {
   shoeRemaining: number
   intermissionUntil?: number | null
 }
+
+// Simple lobby state persisted in rooms.state before a game starts
+export type LobbyParticipant = { name: string; tokenHash: string; userId?: string }
+export type LobbyState = {
+  kind: 'lobby'
+  lobbyId: string
+  hostTokenHash: string
+  participants: LobbyParticipant[]
+  chosenGame?: 'blackjack'
+}

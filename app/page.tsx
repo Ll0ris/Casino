@@ -144,6 +144,11 @@ export default function HomePage() {
           <GameCard label="Slots (yakında)" emoji="🎰" disabled />
         </section>
       )}
+      {/* Lobby panel bottom-left */}
+      {(() => {
+        const Lobby = require('@/components/LobbyPanel').default
+        return <Lobby />
+      })()}
     </main>
   )
 }

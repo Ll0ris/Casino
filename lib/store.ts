@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Game, Player } from './types'
 import { createGame, joinGame, leaveGame, playerHit, playerStand, startRound, playerDoubleDown, computePayouts, playerSplit } from './game'
+import type { LobbyParticipant } from './types'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
@@ -90,6 +91,42 @@ export async function createRoom(name: string, playerToken: string, accountId?: 
   const game = createGame(id, host)
   await store.set(game)
   return { roomId: id }
+}
+
+export async function createRoomWithId(roomId: string, hostName: string, playerToken: string, accountId?: string, others?: LobbyParticipant[]) {
+  const store = getStore()
+  const host: Player = {
+    id: randomId(),
+    seatId: randomId(),
+    name: hostName,
+    tokenHash: hashToken(playerToken),
+    accountId,
+    cards: [],
+    value: 0,
+    busted: false,
+    stood: false,
+    isHost: true,
+  }
+  let game = createGame(roomId, host)
+  if (others && others.length) {
+    for (const p of others) {
+      if (p.tokenHash === host.tokenHash) continue
+      const newP: Player = {
+        id: randomId(),
+        seatId: randomId(),
+        name: p.name,
+        tokenHash: p.tokenHash,
+        accountId: undefined,
+        cards: [],
+        value: 0,
+        busted: false,
+        stood: false,
+      }
+      game = joinGame(game, newP)
+    }
+  }
+  await store.set(game)
+  return { roomId }
 }
 
 export async function ensureJoined(roomId: string, name: string, playerToken: string, accountId?: string, bet?: number) {
