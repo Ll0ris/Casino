@@ -28,11 +28,15 @@ function Hand({ cards }: { cards: Array<{ rank: string; suit: string; hidden?: b
   )
 }
 
+import CopyButton from './CopyButton'
+
 export default function GameTable({
+  roomId,
   state,
   onAction,
   onLeave,
 }: {
+  roomId: string
   state: ClientGameState
   onAction: (action: 'hit' | 'stand' | 'start') => void
   onLeave: () => void
@@ -42,6 +46,15 @@ export default function GameTable({
 
   return (
     <div className="grid gap-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
+      <div className="flex items-center justify-between gap-2 text-xs text-zinc-400">
+        <div className="flex items-center gap-2">
+          <span>Oda ID: {state.id}</span>
+          <span>Oyuncular: {state.players.length}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <CopyButton text={`${location.origin}/room/${roomId}`} label="Davet Linki" />
+        </div>
+      </div>
       <div className="grid gap-2">
         <h2 className="text-lg font-medium">Dağıtıcı</h2>
         <Hand cards={state.dealer.cards} />

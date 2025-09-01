@@ -35,19 +35,24 @@ Provide environment variables to enable persistence:
 - SUPABASE_URL
 - SUPABASE_ANON_KEY
 
-Create a table:
+Schema file:
 
-  create table if not exists public.rooms (
-    id text primary key,
-    state jsonb not null,
-    updated_at timestamp with time zone default now()
-  );
+- db/supabase.sql:1 — tablo ve indeksleri içerir.
+  - Supabase SQL Editor’a yapıştır veya CLI ile uygula.
 
 RLS can stay off for a small project, or write policies to restrict updates.
 
 Notes & Limits
 
-- In-memory store is only for local dev; use Supabase on Vercel.
+- In-memory store is only for local dev; on Vercel you must enable Supabase to allow multiple users to see the same state.
 - Deck draw for hits uses a fresh deck for simplicity. For full fidelity, maintain a shared shoe across a round.
 - HTTP polling interval is configurable in the room UI (0.8–2s).
 
+Vercel Deploy
+
+- Import the repo in Vercel.
+- Add env vars in Project → Settings → Environment Variables:
+  - SUPABASE_URL = https://your-project.supabase.co
+  - SUPABASE_ANON_KEY = <anon key>
+- Apply schema from db/supabase.sql to your Supabase project.
+- Redeploy. Rooms and joins will persist and be shared across serverless instances.

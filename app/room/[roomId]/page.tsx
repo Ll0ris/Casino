@@ -75,6 +75,21 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
     poll()
   }
 
+  const [pendingJoinName, setPendingJoinName] = useState('')
+  const onJoinDirect = async () => {
+    if (!pendingJoinName.trim()) return
+    await fetch(`/api/rooms/${roomId}/join`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-player-token': playerToken,
+      },
+      body: JSON.stringify({ name: pendingJoinName.trim() }),
+    })
+    setPendingJoinName('')
+    poll()
+  }
+
   const onLeave = async () => {
     await fetch(`/api/rooms/${roomId}/action`, {
       method: 'POST',
@@ -131,7 +146,27 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
           </select>
         </div>
       </div>
-      <GameTable state={state} onAction={onAction} onLeave={onLeave} />
+      {!state.me && (
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm text-zinc-300">Bu odaya katıl:</span>
+            <input
+              placeholder="İsminiz"
+              value={pendingJoinName}
+              onChange={(e) => setPendingJoinName(e.target.value)}
+              className="rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-sm outline-none focus:border-zinc-600"
+            />
+            <button
+              onClick={onJoinDirect}
+              disabled={!pendingJoinName.trim() || !playerToken}
+              className="rounded-md bg-sky-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+            >
+              Katıl
+            </button>
+          </div>
+        </div>
+      )}
+      <GameTable roomId={roomId} state={state} onAction={onAction} onLeave={onLeave} />
     </main>
   )
 }
