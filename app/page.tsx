@@ -32,6 +32,17 @@ export default function HomePage() {
     const name = (username || localStorage.getItem('guestName') || '').toString().trim() || `Player-${(localStorage.getItem('playerToken')||'').slice(0,4)}`
     try {
       setBusy(true); setErr(null)
+      const lobbyId = localStorage.getItem('lobbyId')
+      if (lobbyId) {
+        // If we're in a lobby, host tries to choose blackjack; others will be redirected by realtime
+        const r = await fetch(`/api/lobby/${lobbyId}`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken')||'', 'x-user-id': localStorage.getItem('authUserId')||'' }, body: JSON.stringify({ op:'choose', game:'blackjack' }) })
+        if (r.ok) {
+          // Host can navigate immediately
+          location.href = `/room/${lobbyId}`
+          return
+        }
+        // If not host, fall back to normal create
+      }
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken')||'', 'x-user-id': localStorage.getItem('authUserId')||'' },

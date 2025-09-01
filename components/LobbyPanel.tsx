@@ -12,6 +12,7 @@ function hashToken(token: string) {
 export default function LobbyPanel() {
   const [lobbyId, setLobbyId] = useState<string | null>(null)
   const [state, setState] = useState<any>(null)
+  const [reveal, setReveal] = useState(false)
   const token = useMemo(()=> (typeof window!=='undefined' ? localStorage.getItem('playerToken')||'' : ''), [])
   const userId = useMemo(()=> (typeof window!=='undefined' ? localStorage.getItem('authUserId')||'' : ''), [])
 
@@ -77,40 +78,40 @@ export default function LobbyPanel() {
 
   return (
     <div className="fixed bottom-4 left-4 z-30 w-80 max-w-[90vw]">
-      <div className="rounded-lg border border-emerald-800 bg-emerald-950/80 p-3 text-sm text-zinc-100">
-        <div className="mb-2 flex items-center justify-between">
-          <span className="font-semibold">Lobi</span>
-          {!lobbyId ? (
-            <button onClick={createLobby} className="rounded bg-emerald-600 px-2 py-1 text-xs">Lobi Kur</button>
-          ) : (
-            <button onClick={leaveLobby} className="rounded bg-zinc-700 px-2 py-1 text-xs">Lobiden Ayrıl</button>
-          )}
-        </div>
+      <div className="rounded-lg border border-emerald-800 bg-emerald-950/90 p-3 text-sm text-zinc-100">
+        <div className="mb-2 text-center font-semibold">Lobi</div>
         {!lobbyId ? (
-          <div className="text-xs text-zinc-300">Bir lobi kur veya kodla katıl.</div>
-        ) : (
           <div className="grid gap-2">
-            <div className="flex items-center justify-between">
-              <div>Lobi Kodu: <span className="font-mono">{masked(lobbyId)}</span></div>
-              <div className="flex items-center gap-2">
-                <button onClick={()=>alert(lobbyId)} className="rounded bg-zinc-700 px-2 py-1 text-xs">Gör</button>
-                <CopyButton text={location.origin+`/lobby/${lobbyId}`} label="Kopyala" />
-              </div>
+            <button onClick={createLobby} className="rounded bg-emerald-600 px-3 py-2 text-xs">Lobi Kur</button>
+            <button onClick={()=> joinLobby(prompt('Lobi kodu?')||'')} className="rounded bg-zinc-700 px-3 py-2 text-xs">Koda göre katıl</button>
+          </div>
+        ) : (
+          <div className="grid gap-3">
+            {/* Code row */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 rounded-md border border-emerald-800 bg-emerald-900/40 px-3 py-1.5 font-mono tracking-widest">{reveal ? lobbyId : '*******'}</div>
+              <button title={reveal? 'Gizle':'Göster'} onClick={()=>setReveal(v=>!v)} className="rounded bg-zinc-700 px-2 py-1 text-xs">{reveal? '🙈':'👁️'}</button>
+              <CopyButton text={lobbyId} label="Kopyala" />
             </div>
-            <div className="max-h-60 overflow-auto rounded border border-emerald-900 bg-emerald-950/40 p-2">
-              <div className="mb-1 text-xs text-zinc-400">Katılanlar</div>
-              <div className="grid gap-1">
-                {(state?.participants||[]).map((p:any, i:number)=> (
-                  <div key={i} className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500"/> {p.name}</div>
-                ))}
-              </div>
+            <hr className="border-emerald-900/60" />
+            {/* Participants */}
+            <div className="grid gap-2 max-h-72 overflow-auto pr-1">
+              {(state?.participants||[]).map((p:any, i:number)=> {
+                const isHost = state?.hostTokenHash === p.tokenHash
+                const iAmHost = state?.hostTokenHash === hashToken(token)
+                const canKick = iAmHost && !isHost
+                return (
+                  <div key={i} className="flex items-center gap-2 rounded-full border border-emerald-800 bg-emerald-900/30 px-3 py-1.5">
+                    <div className="flex-1">{p.name} {isHost && <span title="Kurucu">👑</span>}</div>
+                    {canKick && (
+                      <button title="Kov" onClick={async()=>{ await fetch(`/api/lobby/${lobbyId}`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': token }, body: JSON.stringify({ op:'kick', targetHash: p.tokenHash }) }); }} className="rounded bg-zinc-700 px-2 py-1 text-xs">✖</button>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-            {state?.hostTokenHash === hashToken(token) && (
-              <button onClick={startBlackjack} className="rounded bg-emerald-600 px-3 py-2 text-xs">Blackjack ile başlat</button>
-            )}
-            {state && !lobbyId && (
-              <button onClick={()=> joinLobby(prompt('Lobi kodu?')||'')} className="rounded bg-zinc-700 px-2 py-1 text-xs">Koda göre katıl</button>
-            )}
+            {/* Leave button bottom */}
+            <button onClick={leaveLobby} className="mt-1 rounded bg-zinc-700 px-3 py-2 text-xs">Lobiden Ayrıl</button>
           </div>
         )}
       </div>

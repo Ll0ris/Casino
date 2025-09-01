@@ -35,6 +35,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lob
     await sb.from('rooms').upsert({ id: lobbyId, state })
     return Response.json(state)
   }
+  if (op === 'kick') {
+    // host can remove a participant by tokenHash
+    if (state.hostTokenHash !== tokenHash) return Response.json({ error: 'forbidden' }, { status: 403 })
+    const target = (body?.targetHash || '').toString()
+    state.participants = (state.participants||[]).filter((p: any)=> p.tokenHash !== target)
+    await sb.from('rooms').upsert({ id: lobbyId, state })
+    return Response.json(state)
+  }
   if (op === 'leave') {
     state.participants = (state.participants||[]).filter((p: any)=> p.tokenHash !== tokenHash)
     if (!state.participants.length) {
