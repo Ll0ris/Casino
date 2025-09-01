@@ -8,11 +8,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   try {
     const { roomId } = await params
     const body = await req.json().catch(() => ({}))
-    const deckCount = Number(body?.deckCount)
+    const deckCount = body?.deckCount !== undefined ? Number(body?.deckCount) : undefined
     const shuffleAt = body?.shuffleAt !== undefined ? Number(body?.shuffleAt) : undefined
+    const autoContinue = body?.autoContinue !== undefined ? Boolean(body?.autoContinue) : undefined
     const token = req.headers.get('x-player-token') || ''
     if (!token) return Response.json({ error: 'token required' }, { status: 400 })
-    const g = await updateSettings(roomId, token, deckCount, shuffleAt)
+    const g = await updateSettings(roomId, token, deckCount, shuffleAt, autoContinue)
     if (!g) return Response.json({ error: 'not found' }, { status: 404 })
     return Response.json(toClient(g, hashToken(token)))
   } catch (e: any) {
@@ -20,4 +21,3 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
     return Response.json({ error: 'internal_error' }, { status: 500 })
   }
 }
-

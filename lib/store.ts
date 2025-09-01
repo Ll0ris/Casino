@@ -305,7 +305,7 @@ export async function forceTimeout(roomId: string) {
   return next
 }
 
-export async function updateSettings(roomId: string, playerToken: string, deckCount?: number, shuffleAt?: number) {
+export async function updateSettings(roomId: string, playerToken: string, deckCount?: number, shuffleAt?: number, autoContinue?: boolean) {
   const store = getStore()
   const g = await store.get(roomId)
   if (!g) return null
@@ -314,7 +314,8 @@ export async function updateSettings(roomId: string, playerToken: string, deckCo
   if (!me || !me.isHost) return g
   const dc = deckCount ? Math.max(1, Math.min(6, Math.floor(deckCount))) : g.settings.deckCount
   const sa = typeof shuffleAt === 'number' ? Math.max(1, Math.floor(shuffleAt)) : g.settings.shuffleAt
-  const next: Game = { ...g, settings: { deckCount: dc, shuffleAt: sa }, updatedAt: Date.now() }
+  const ac = typeof autoContinue === 'boolean' ? autoContinue : (g.settings.autoContinue ?? true)
+  const next: Game = { ...g, settings: { deckCount: dc, shuffleAt: sa, autoContinue: ac }, updatedAt: Date.now() }
   await store.set(next)
   return next
 }

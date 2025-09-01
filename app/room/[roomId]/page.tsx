@@ -94,6 +94,11 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
       if (state?.status === 'in_round' && exp && Date.now() > exp) {
         fetch(`/api/rooms/${roomId}/timeout`, { method: 'POST' })
       }
+      const inter = (state as any)?.intermissionUntil || 0
+      const auto = (state as any)?.settings?.autoContinue ?? true
+      if (state?.status === 'round_over' && auto && inter && Date.now() > inter && state.isHost) {
+        fetch(`/api/rooms/${roomId}`, { method: 'POST', headers: { 'Content-Type':'application/json', 'x-player-token': playerToken }, body: JSON.stringify({ op: 'start' }) })
+      }
     }
     timeoutRef.current = setInterval(tick, 1000)
     const handleUnload = () => {

@@ -76,9 +76,10 @@ export function createGame(id: string, host: Player): Game {
     turnExpiresAt: null,
     updatedAt: Date.now(),
     message: undefined,
-    settings: { deckCount: 1, shuffleAt: 35 },
+    settings: { deckCount: 1, shuffleAt: 35, autoContinue: true },
     shoe: [],
     lastSeen: {},
+    intermissionUntil: null,
   }
 }
 
@@ -157,6 +158,7 @@ export function startRound(game: Game): Game {
     updatedAt: Date.now(),
     message: needShuffle ? 'Deste karıştırıldı' : undefined,
     shoe,
+    intermissionUntil: null,
   }
 }
 
@@ -180,7 +182,7 @@ export function playerHit(game: Game, playerId: string): Game {
       const { dealer, msg, shoe: shoeNext } = dealerFinish(game.dealer, players, shoe)
       shoe = shoeNext
       message = msg
-      return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, turnExpiresAt: null, updatedAt: Date.now(), message, shoe }
+      return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, turnExpiresAt: null, intermissionUntil: Date.now() + 3000, updatedAt: Date.now(), message, shoe }
     }
   }
   return { ...game, players, status: game.status, turnPlayerId, turnExpiresAt: game.turnExpiresAt, updatedAt: Date.now(), message, shoe }
@@ -205,6 +207,7 @@ export function playerStand(game: Game, playerId: string): Game {
     status: 'round_over',
     turnPlayerId: null,
     turnExpiresAt: null,
+    intermissionUntil: Date.now() + 3000,
     updatedAt: Date.now(),
     message: msg,
     shoe,
@@ -229,7 +232,7 @@ export function playerDoubleDown(game: Game, playerId: string): Game {
   }
   const { dealer, msg, shoe: shoeNext } = dealerFinish(game.dealer, players, shoe)
   shoe = shoeNext
-  return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, turnExpiresAt: null, updatedAt: Date.now(), message: msg, shoe }
+  return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, turnExpiresAt: null, intermissionUntil: Date.now() + 3000, updatedAt: Date.now(), message: msg, shoe }
 }
 
 export function playerSplit(game: Game, playerId: string): Game {
@@ -263,7 +266,7 @@ export function playerSplit(game: Game, playerId: string): Game {
   second.busted = second.value > 21
 
   players.splice(idx, 1, first, second)
-  return { ...game, players, turnPlayerId: first.id, turnExpiresAt: Date.now() + 15000, updatedAt: Date.now() }
+  return { ...game, players, turnPlayerId: first.id, turnExpiresAt: Date.now() + 15000, updatedAt: Date.now(), intermissionUntil: null }
 }
 
 function dealerFinish(dealer: Dealer, players: Player[], shoe: Card[]) {
@@ -387,5 +390,6 @@ export function toClient(game: Game, tokenHash: string) {
     message: game.message,
     settings: game.settings,
     shoeRemaining: game.shoe.length,
+    intermissionUntil: game.intermissionUntil || null,
   }
 }

@@ -1,4 +1,5 @@
 "use client"
+import { useEffect, useState } from 'react'
 import type { ClientGameState } from '@/lib/types'
 import clsx from 'clsx'
 
@@ -48,6 +49,11 @@ export default function GameTable({
   const canDouble = state.status === 'in_round' && isMyTurn && currentHand && (currentHand.cards.filter((c)=>!c.hidden).length === 2) && !currentHand.doubled
   const canSplit = state.status === 'in_round' && isMyTurn && currentHand && (currentHand.cards.filter((c)=>!c.hidden).length === 2) && (currentHand.cards?.[0]?.rank === currentHand.cards?.[1]?.rank)
   const dealerAceUp = state.dealer.cards[0] && !state.dealer.cards[0].hidden && state.dealer.cards[0].rank === 'A'
+  const [now, setNow] = useState(Date.now())
+  useEffect(()=>{
+    const t = setInterval(()=>setNow(Date.now()), 300)
+    return ()=>clearInterval(t)
+  },[])
   const takeInsurance = async (amount?: number) => {
     const val = amount ?? Math.max(0, (me?.bet || 0) / 2)
     await fetch(`/api/rooms/${roomId}/insurance`, {
@@ -107,6 +113,10 @@ export default function GameTable({
           <div className="rounded-md border border-zinc-700/60 bg-zinc-950/40 px-2 py-1">Kalan kart: <span className="font-medium">{state.shoeRemaining}</span></div>
           <div className="rounded-md border border-zinc-700/60 bg-zinc-950/40 px-2 py-1">Deste sayısı: <span className="font-medium">{state.settings.deckCount}</span></div>
         </div>
+        <div className="ml-auto flex items-center gap-3">
+          {/* Scoreboard */}
+          <Scoreboard roomId={roomId} mySeatId={me?.seatId || ''} refreshKey={state.intermissionUntil || state.turnPlayerId || 0} />
+        </div>
         {state.isHost && (
           <div className="flex items-center gap-2">
             <span className="text-zinc-400">Deste</span>
@@ -120,10 +130,16 @@ export default function GameTable({
                 await fetch(`/api/rooms/${roomId}/settings`, {
                   method: 'POST',
                   headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken') || '' },
-                  body: JSON.stringify({ deckCount: v, shuffleAt: 35 })
+                  body: JSON.stringify({ deckCount: v, shuffleAt: 35, autoContinue: state.settings?.autoContinue ?? true })
                 })
               }}
             />
+            <label className="ml-2 flex items-center gap-1">
+              <input type="checkbox" defaultChecked={(state.settings as any).autoContinue ?? true} onChange={async(e)=>{
+                await fetch(`/api/rooms/${roomId}/settings`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken') || '' }, body: JSON.stringify({ autoContinue: e.target.checked }) })
+              }} />
+              <span>Oto geçiş</span>
+            </label>
           </div>
         )}
       </div>
@@ -151,7 +167,10 @@ export default function GameTable({
                 </div>
               </div>
               <div className="mt-2 flex flex-wrap gap-3">
-                {seat.hands.map((h, idx) => (
+                {seat.hands.map((h, idx) => {
+                  const isTurn = h.id === state.turnPlayerId && state.status === 'in_round'
+                  const secs = isTurn && state.turnExpiresAt ? Math.max(0, Math.ceil((state.turnExpiresAt - now)/1000)) : null
+                  return (
                   <div key={h.id} className={clsx('rounded-md border border-zinc-700/60 p-2', h.id === state.turnPlayerId && state.status === 'in_round' ? 'outline outline-2 outline-amber-400/60 bg-amber-400/10' : 'bg-zinc-950/40')}>
                     <div className="mb-1 flex items-center justify-between text-xs text-zinc-400">
                       <span>El {idx + 1}</span>
@@ -159,6 +178,7 @@ export default function GameTable({
                         <span>Bet: {h.bet ?? 0}</span>
                         {h.insurance ? <span>Ins: {h.insurance}</span> : null}
                         <span>Puan: {h.value}</span>
+                        {secs !== null && <span className="text-amber-300">Süre: {secs}s</span>}
                       </div>
                     </div>
                     <Hand cards={h.cards} />
@@ -167,7 +187,7 @@ export default function GameTable({
                       {!h.busted && h.stood && <span className="rounded bg-sky-600/20 px-1.5 py-0.5 text-sky-300">Stand</span>}
                     </div>
                   </div>
-                ))}
+                )})}
               </div>
             </div>
           ))}
@@ -257,6 +277,63 @@ export default function GameTable({
           <span>Insurance mevcut (Dealer Ace).</span>
           <button onClick={()=>takeInsurance()} className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium hover:bg-amber-500">Yarım Bet Al</button>
           <span className="text-xs text-amber-200/80">(Max: {(me.bet||0)/2})</span>
+        </div>
+      )}
+
+      {state.status === 'round_over' && state.intermissionUntil && (
+        <div className="text-center text-sm text-zinc-300">
+          Yeni el {Math.max(0, Math.ceil((state.intermissionUntil - now)/1000))}s içinde başlayacak
+        </div>
+      )}
+
+      {/* Bottom-left my balance */}
+      <MyBalance roomId={roomId} mySeatId={me?.seatId || ''} refreshKey={state.intermissionUntil || state.turnPlayerId || 0} />
+    </div>
+  )
+}
+
+function MyBalance({ roomId, mySeatId, refreshKey }: { roomId: string; mySeatId: string; refreshKey: number|string }) {
+  const [bal, setBal] = useState<number | null>(null)
+  useEffect(()=>{
+    const load = async ()=>{
+      const res = await fetch(`/api/rooms/${roomId}/balances`, { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      const me = (data?.items||[]).find((x:any)=>x.seatId === mySeatId)
+      setBal(me?.balance ?? null)
+    }
+    load()
+  },[roomId, mySeatId, refreshKey])
+  return (
+    <div className="fixed left-4 bottom-4 rounded-md border border-zinc-700/60 bg-zinc-950/70 px-3 py-2 text-sm text-zinc-200">
+      Bakiye: <span className="font-semibold">{bal ?? '-'}</span>
+    </div>
+  )
+}
+
+function Scoreboard({ roomId, mySeatId, refreshKey }: { roomId: string; mySeatId: string; refreshKey: number|string }) {
+  const [items, setItems] = useState<Array<{ seatId: string; name: string; balance: number }>>([])
+  useEffect(()=>{
+    const load = async ()=>{
+      const res = await fetch(`/api/rooms/${roomId}/balances`, { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      const arr = (data?.items||[]).sort((a:any,b:any)=> (b.balance||0)-(a.balance||0))
+      setItems(arr)
+    }
+    load()
+  },[roomId, refreshKey])
+  const top = items[0]
+  return (
+    <div className="rounded-md border border-zinc-700/60 bg-zinc-950/70 p-2 text-xs text-zinc-300">
+      <div className="mb-1 text-zinc-400">Skor Tablosu</div>
+      {items.length === 0 ? <div>—</div> : (
+        <div className="flex items-center gap-3">
+          {items.map((x)=> (
+            <div key={x.seatId} className={x.seatId===mySeatId? 'font-semibold text-emerald-300':'text-zinc-300'}>
+              {x.name}: {x.balance ?? 0}
+            </div>
+          ))}
         </div>
       )}
     </div>

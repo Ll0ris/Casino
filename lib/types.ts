@@ -39,9 +39,11 @@ export type Game = {
   settings: {
     deckCount: number
     shuffleAt: number
+    autoContinue?: boolean
   }
   shoe: Card[]
   lastSeen?: Record<string, number>
+  intermissionUntil?: number | null
 }
 
 export type ClientPlayer = Pick<Player, 'id' | 'seatId' | 'name' | 'cards' | 'value' | 'busted' | 'stood' | 'bet' | 'doubled' | 'insurance'>
@@ -57,6 +59,7 @@ export type ClientGameState = {
   isHost: boolean
   me: (ClientPlayer & { seatId: string }) | null
   message?: string
-  settings: { deckCount: number; shuffleAt: number }
+  settings: { deckCount: number; shuffleAt: number; autoContinue?: boolean }
   shoeRemaining: number
+  intermissionUntil?: number | null
 }
