@@ -34,17 +34,18 @@ export default function SiteHeader() {
   }
 
   return (
-    <header className="flex items-center justify-between">
-      <button onClick={() => router.push('/')} className="flex items-center gap-2">
-        <img src="/logo.png" alt="logo" className="h-8 w-8 rounded" onError={(e)=>{ (e.currentTarget as HTMLImageElement).style.display='none' }} />
-        <span className="text-lg font-semibold tracking-wide">Virtual Casino</span>
-      </button>
-      <div className="flex items-center gap-3 text-sm">
-        <div className="rounded-md border border-emerald-900/50 bg-emerald-950/30 px-3 py-1.5">Bakiye: <span className="font-semibold">{balance ?? '-'}</span> $</div>
-        <button onClick={() => router.push('/profile')} className="btn-secondary"><i className="fa-solid fa-user mr-2"/>Profil</button>
-        <button onClick={logout} className="btn-secondary"><i className="fa-solid fa-arrow-right-from-bracket mr-2"/>Çıkış</button>
+    <header className="w-full rounded-md bg-emerald-900 px-5 py-3 text-sm shadow-sm">
+      <div className="mx-auto flex max-w-6xl items-center justify-between">
+        <button onClick={() => router.push('/')} className="flex items-center gap-2">
+          <img src="/assets/images/logo.png" alt="logo" className="h-8 w-8 rounded" onError={(e)=>{ (e.currentTarget as HTMLImageElement).style.display='none' }} />
+          <span className="text-base font-semibold tracking-wide">Virtual Casino</span>
+        </button>
+        <div className="flex items-center gap-3 text-sm">
+          <div className="rounded-md bg-emerald-950/40 px-3 py-1.5">Bakiye: <span className="font-semibold">{balance ?? '-'}</span> $</div>
+          <button onClick={() => router.push('/profile')} className="btn-secondary"><i className="fa-solid fa-user mr-2"/>Profil</button>
+          <button onClick={logout} className="btn-secondary"><i className="fa-solid fa-arrow-right-from-bracket mr-2"/>Çıkış</button>
+        </div>
       </div>
     </header>
   )
 }
-

@@ -83,7 +83,7 @@ export default function HomePage() {
                     if (error) throw error
                     const userId = data.user?.id
                     if (userId) {
-                      await fetch('/api/profile', { method:'POST', headers: { 'Content-Type':'application/json', 'x-user-id': userId }, body: JSON.stringify({ email: authEmail, username: authUsername }) })
+                      await fetch('/api/profile', { method:'POST', headers: { 'Content-Type':'application/json', 'x-user-id': userId }, body: JSON.stringify({ email: authEmail, username: authUsername || authEmail.split('@')[0] }) })
                       localStorage.setItem('authUserId', userId); setAuthUserId(userId); router.refresh()
                     }
                   } catch (e:any) { setAuthMsg(e?.message || 'Kayıt başarısız') }
@@ -105,7 +105,15 @@ export default function HomePage() {
                     const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword })
                     if (error) throw error
                     const userId = data.user?.id
-                    if (userId) { localStorage.setItem('authUserId', userId); setAuthUserId(userId); router.refresh() }
+                    if (userId) {
+                      localStorage.setItem('authUserId', userId); setAuthUserId(userId)
+                      // ensure profile row exists
+                      const prof = await fetch('/api/profile', { headers: { 'x-user-id': userId } }).then(r=>r.json()).catch(()=>null)
+                      if (!prof?.user_id) {
+                        await fetch('/api/profile', { method:'POST', headers: { 'Content-Type':'application/json', 'x-user-id': userId }, body: JSON.stringify({ email: authEmail, username: authEmail.split('@')[0] }) })
+                      }
+                      router.refresh()
+                    }
                   } catch (e:any) { setAuthMsg(e?.message || 'Giriş başarısız') }
                 }}>Giriş Yap</button>
               </div>
@@ -130,30 +138,17 @@ export default function HomePage() {
           )}
         </section>
       ) : (
-        <>
-          <div className="flex items-center justify-between">
-            <div className="rounded-md border border-emerald-900/50 bg-emerald-950/40 px-3 py-1.5 text-sm">Bakiye: <span className="font-semibold">{balance ?? '-'}</span> $</div>
-            <button className="btn-secondary" onClick={()=>router.push('/profile')}><i className="fa-solid fa-user mr-2"/>Profil</button>
-          </div>
-          <section className="card">
-            <div className="mb-4 flex items-center gap-2">
-              <i className="fa-solid fa-cards-blank text-xl"/>
-              <h2 className="text-lg font-medium">Blackjack</h2>
-            </div>
-            {err && <div className="mb-3 rounded border border-red-700 bg-red-900/20 p-2 text-sm text-red-300">{err}</div>}
-            <div className="grid gap-3 sm:grid-cols-3">
-              <input className="input sm:col-span-2" placeholder="İsminiz" value={name} onChange={(e)=>setName(e.target.value)} />
-              <button className="btn-primary" disabled={busy || !name.trim()} onClick={onCreate}><i className="fa-solid fa-plus mr-2"/>Oda Oluştur</button>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <input className="input" placeholder="Oda Kodu" value={joiningId} onChange={(e)=>setJoiningId(e.target.value)} />
-              <input className="input" placeholder="İsminiz" value={name} onChange={(e)=>setName(e.target.value)} />
-              <button className="btn-secondary bg-sky-600 hover:bg-sky-500" disabled={busy || !name.trim() || !joiningId.trim()} onClick={onJoin}><i className="fa-solid fa-right-to-bracket mr-2"/>Katıl</button>
-            </div>
-          </section>
-        </>
+        <section className="grid gap-6">
+          {err && <div className="mb-3 rounded border border-red-700 bg-red-900/20 p-2 text-sm text-red-300">{err}</div>}
+          <button
+            onClick={onCreate}
+            className="grid place-items-center gap-2 rounded-xl bg-white p-10 text-emerald-900 shadow hover:shadow-lg transition-shadow"
+          >
+            <div className="text-4xl">🃏</div>
+            <div className="text-xl font-semibold">Blackjack Oyna</div>
+          </button>
+        </section>
       )}
     </main>
   )
 }
-
