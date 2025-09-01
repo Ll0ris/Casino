@@ -37,14 +37,25 @@ function makeSupabaseStore(): Store {
         .select('state')
         .eq('id', id)
         .single()
-      if (error) return null
+      if (error) {
+        console.error('[supabase:get] rooms', id, error.message)
+        return null
+      }
       return (data?.state as Game) || null
     },
     async set(game) {
-      await supabase.from('rooms').upsert({ id: game.id, state: game })
+      const { error } = await supabase.from('rooms').upsert({ id: game.id, state: game })
+      if (error) {
+        console.error('[supabase:set] rooms', game.id, error.message)
+        throw error
+      }
     },
     async remove(id) {
-      await supabase.from('rooms').delete().eq('id', id)
+      const { error } = await supabase.from('rooms').delete().eq('id', id)
+      if (error) {
+        console.error('[supabase:remove] rooms', id, error.message)
+        throw error
+      }
     },
   }
 }
@@ -153,4 +164,3 @@ function randomId() {
     ? crypto.randomUUID().slice(0, 8)
     : Math.random().toString(36).slice(2, 10)
 }
-
