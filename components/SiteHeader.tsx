@@ -28,7 +28,9 @@ export default function SiteHeader() {
     const hb = setInterval(() => {
       fetch('/api/profile/heartbeat', { method: 'POST', headers: { 'x-user-id': uid } })
     }, 60000)
-    return () => clearInterval(t)
+    const onAuthChanged = () => load()
+    window.addEventListener('auth-changed', onAuthChanged as any)
+    return () => { clearInterval(t); clearInterval(hb); window.removeEventListener('auth-changed', onAuthChanged as any) }
   }, [])
 
   const logout = async () => {

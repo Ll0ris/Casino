@@ -78,7 +78,8 @@ export default function HomePage() {
                     if (userId) {
                       await fetch('/api/profile', { method:'POST', headers: { 'Content-Type':'application/json', 'x-user-id': userId }, body: JSON.stringify({ email: authEmail, username: authUsername || authEmail.split('@')[0] }) })
                       localStorage.setItem('authUserId', userId); setAuthUserId(userId); setUsername(authUsername || authEmail.split('@')[0]);
-                      router.refresh()
+                      window.dispatchEvent(new Event('auth-changed'))
+                      location.reload()
                     }
                   } catch (e:any) { setAuthMsg(e?.message || 'Kayıt başarısız') }
                 }}>Kaydol</button>
@@ -108,7 +109,8 @@ export default function HomePage() {
                       } else {
                         setUsername(prof?.username || prof?.email?.split('@')[0] || '')
                       }
-                      router.refresh()
+                      window.dispatchEvent(new Event('auth-changed'))
+                      location.reload()
                     }
                   } catch (e:any) { setAuthMsg(e?.message || 'Giriş başarısız') }
                 }}>Giriş Yap</button>
