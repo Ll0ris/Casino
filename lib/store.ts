@@ -77,6 +77,7 @@ export async function createRoom(name: string, playerToken: string, accountId?: 
   const id = randomId()
   const host: Player = {
     id: randomId(),
+    seatId: randomId(),
     name,
     tokenHash: hashToken(playerToken),
     accountId,
@@ -100,6 +101,7 @@ export async function ensureJoined(roomId: string, name: string, playerToken: st
   if (exists) return g
   const newPlayer: Player = {
     id: randomId(),
+    seatId: randomId(),
     name,
     tokenHash,
     accountId,

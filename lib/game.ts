@@ -199,6 +199,7 @@ export function playerSplit(game: Game, playerId: string): Game {
   const second: Player = {
     ...me,
     id: uid(),
+    seatId: me.seatId,
     isHost: false,
     cards: [visible[1]],
     doubled: false,
@@ -299,6 +300,7 @@ export function toClient(game: Game, tokenHash: string) {
     id: game.id,
     players: game.players.map((p) => ({
       id: p.id,
+      seatId: p.seatId,
       name: p.name,
       cards: p.cards,
       value: p.value,
@@ -315,6 +317,7 @@ export function toClient(game: Game, tokenHash: string) {
     me: me
       ? {
           id: me.id,
+          seatId: me.seatId,
           name: me.name,
           cards: me.cards,
           value: me.value,

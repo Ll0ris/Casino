@@ -42,9 +42,11 @@ export default function GameTable({
   onLeave: () => void
 }) {
   const me = state.me
-  const isMyTurn = state.turnPlayerId === me?.id
-  const canDouble = state.status === 'in_round' && isMyTurn && (me?.cards?.filter((c)=>!c.hidden).length === 2) && !me?.doubled
-  const canSplit = state.status === 'in_round' && isMyTurn && (me?.cards?.filter((c)=>!c.hidden).length === 2) && (me?.cards?.[0]?.rank === me?.cards?.[1]?.rank)
+  const mySeatId = me?.seatId
+  const currentHand = state.players.find((p) => p.id === state.turnPlayerId) || null
+  const isMyTurn = Boolean(currentHand && mySeatId && currentHand.seatId === mySeatId)
+  const canDouble = state.status === 'in_round' && isMyTurn && currentHand && (currentHand.cards.filter((c)=>!c.hidden).length === 2) && !currentHand.doubled
+  const canSplit = state.status === 'in_round' && isMyTurn && currentHand && (currentHand.cards.filter((c)=>!c.hidden).length === 2) && (currentHand.cards?.[0]?.rank === currentHand.cards?.[1]?.rank)
   const dealerAceUp = state.dealer.cards[0] && !state.dealer.cards[0].hidden && state.dealer.cards[0].rank === 'A'
   const takeInsurance = async (amount?: number) => {
     const val = amount ?? Math.max(0, (me?.bet || 0) / 2)
@@ -108,33 +110,38 @@ export default function GameTable({
       <div className="grid gap-4">
         <h2 className="text-lg font-medium">Oyuncular</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {state.players.map((p) => (
-            <div
-              key={p.id}
-              className={clsx(
-                'rounded-lg border p-3',
-                p.id === me?.id ? 'border-emerald-700 bg-emerald-900/10' : 'border-zinc-800 bg-zinc-900'
-              )}
-            >
+          {Object.values(
+            state.players.reduce((acc: Record<string, { name: string; seatId: string; hands: typeof state.players }>, p) => {
+              const key = p.seatId
+              if (!acc[key]) acc[key] = { name: p.name, seatId: p.seatId, hands: [] as any }
+              acc[key].hands.push(p)
+              return acc
+            }, {})
+          ).map((seat) => (
+            <div key={seat.seatId} className={clsx('rounded-lg border p-3', seat.seatId === mySeatId ? 'border-emerald-700 bg-emerald-900/10' : 'border-zinc-800 bg-zinc-900')}>
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{p.name}</span>
-                  {p.id === state.turnPlayerId && state.status === 'in_round' && (
-                    <span className="rounded bg-amber-600/20 px-1.5 py-0.5 text-amber-300">Sıra</span>
-                  )}
-                  {p.busted && <span className="rounded bg-red-600/20 px-1.5 py-0.5 text-red-300">Bust</span>}
-                  {p.stood && <span className="rounded bg-sky-600/20 px-1.5 py-0.5 text-sky-300">Stand</span>}
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-zinc-400">Bet: {p.bet ?? 0}</span>
-                  {p.insurance ? (
-                    <span className="text-zinc-400">Ins: {p.insurance}</span>
-                  ) : null}
-                  <span className="text-zinc-400">Puan: {p.value}</span>
+                  <span className="font-medium">{seat.name}</span>
                 </div>
               </div>
-              <div className="mt-2">
-                <Hand cards={p.cards} />
+              <div className="mt-2 flex flex-wrap gap-3">
+                {seat.hands.map((h, idx) => (
+                  <div key={h.id} className={clsx('rounded-md border border-zinc-700/60 p-2', h.id === state.turnPlayerId && state.status === 'in_round' ? 'outline outline-2 outline-amber-400/60 bg-amber-400/10' : 'bg-zinc-950/40')}>
+                    <div className="mb-1 flex items-center justify-between text-xs text-zinc-400">
+                      <span>El {idx + 1}</span>
+                      <div className="flex items-center gap-2">
+                        <span>Bet: {h.bet ?? 0}</span>
+                        {h.insurance ? <span>Ins: {h.insurance}</span> : null}
+                        <span>Puan: {h.value}</span>
+                      </div>
+                    </div>
+                    <Hand cards={h.cards} />
+                    <div className="mt-1 text-[11px]">
+                      {h.busted && <span className="rounded bg-red-600/20 px-1.5 py-0.5 text-red-300">Bust</span>}
+                      {!h.busted && h.stood && <span className="rounded bg-sky-600/20 px-1.5 py-0.5 text-sky-300">Stand</span>}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}

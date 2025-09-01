@@ -5,6 +5,7 @@ export type Card = { rank: Rank; suit: Suit; hidden?: boolean }
 
 export type Player = {
   id: string
+  seatId: string
   name: string
   tokenHash: string
   accountId?: string
@@ -35,7 +36,7 @@ export type Game = {
   message?: string
 }
 
-export type ClientPlayer = Pick<Player, 'id' | 'name' | 'cards' | 'value' | 'busted' | 'stood' | 'bet' | 'doubled' | 'insurance'>
+export type ClientPlayer = Pick<Player, 'id' | 'seatId' | 'name' | 'cards' | 'value' | 'busted' | 'stood' | 'bet' | 'doubled' | 'insurance'>
 export type ClientDealer = Pick<Dealer, 'cards' | 'value'>
 
 export type ClientGameState = {
@@ -45,6 +46,6 @@ export type ClientGameState = {
   status: GameStatus
   turnPlayerId: string | null
   isHost: boolean
-  me: ClientPlayer | null
+  me: (ClientPlayer & { seatId: string }) | null
   message?: string
 }
