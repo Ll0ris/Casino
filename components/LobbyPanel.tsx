@@ -27,13 +27,15 @@ export default function LobbyPanel() {
 
   useEffect(()=>{
     const saved = localStorage.getItem('lobbyId')
-    if (saved) {
-      setLobbyId(saved)
-      fetch(`/api/lobby/${saved}`).then(r=>r.json()).then(setState).catch(()=>{})
-      const ch = subscribe(saved)
-      return () => { const sb = getSupabaseClient(); if (sb && ch) sb.removeChannel(ch) }
-    }
+    if (saved) setLobbyId(saved)
   }, [])
+
+  useEffect(()=>{
+    if (!lobbyId) return
+    fetch(`/api/lobby/${lobbyId}`).then(r=>r.json()).then(setState).catch(()=>{})
+    const ch = subscribe(lobbyId)
+    return () => { const sb = getSupabaseClient(); if (sb && ch) sb.removeChannel(ch) }
+  }, [lobbyId])
 
   useEffect(()=>{
     if (state?.chosenGame === 'blackjack' && lobbyId) {
@@ -54,12 +56,8 @@ export default function LobbyPanel() {
   }
 
   const joinLobby = async (id: string) => {
-    const name = localStorage.getItem('guestName') || localStorage.getItem('displayName') || 'Player'
-    await fetch(`/api/lobby/${id}`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': token, 'x-user-id': userId }, body: JSON.stringify({ op:'join', name }) })
-    localStorage.setItem('lobbyId', id)
-    setLobbyId(id)
-    const s = await (await fetch(`/api/lobby/${id}`)).json()
-    setState(s)
+    // Yönlendirme: gate sayfası zorunlu
+    location.href = `/lobby/${id}`
   }
 
   const leaveLobby = async () => {

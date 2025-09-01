@@ -116,7 +116,7 @@ export async function createRoomWithId(roomId: string, hostName: string, playerT
         seatId: randomId(),
         name: p.name,
         tokenHash: p.tokenHash,
-        accountId: undefined,
+        accountId: (p as any).userId,
         cards: [],
         value: 0,
         busted: false,
