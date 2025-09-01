@@ -54,7 +54,7 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
 
   const onAction = async (action: 'hit' | 'stand' | 'start') => {
     if (action === 'start') {
-      await fetch(`/api/rooms/${roomId}`, {
+      const res = await fetch(`/api/rooms/${roomId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -62,9 +62,10 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
         },
         body: JSON.stringify({ op: 'start' }),
       })
+      if (!res.ok) return
       return poll()
     }
-    await fetch(`/api/rooms/${roomId}/action`, {
+    const res = await fetch(`/api/rooms/${roomId}/action`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -72,13 +73,13 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
       },
       body: JSON.stringify({ action }),
     })
-    poll()
+    if (res.ok) poll()
   }
 
   const [pendingJoinName, setPendingJoinName] = useState('')
   const onJoinDirect = async () => {
     if (!pendingJoinName.trim()) return
-    await fetch(`/api/rooms/${roomId}/join`, {
+    const res = await fetch(`/api/rooms/${roomId}/join`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -86,8 +87,10 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
       },
       body: JSON.stringify({ name: pendingJoinName.trim() }),
     })
-    setPendingJoinName('')
-    poll()
+    if (res.ok) {
+      setPendingJoinName('')
+      poll()
+    }
   }
 
   const onLeave = async () => {

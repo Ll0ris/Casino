@@ -8,6 +8,7 @@ export default function HomePage() {
   const [name, setName] = useState('')
   const [joiningId, setJoiningId] = useState('')
   const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
     // Ensure we have a persistent player token
@@ -21,6 +22,7 @@ export default function HomePage() {
     if (!name.trim()) return
     try {
       setBusy(true)
+      setErr(null)
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: {
@@ -29,8 +31,14 @@ export default function HomePage() {
         },
         body: JSON.stringify({ name }),
       })
-      const data = await res.json()
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        setErr(text || 'Oda oluşturulamadı. Sunucu hatası.')
+        return
+      }
+      const data = await res.json().catch(() => null)
       if (data?.roomId) router.push(`/room/${data.roomId}`)
+      else setErr('Oda oluşturulamadı. Geçersiz yanıt.')
     } finally {
       setBusy(false)
     }
@@ -40,6 +48,7 @@ export default function HomePage() {
     if (!name.trim() || !joiningId.trim()) return
     try {
       setBusy(true)
+      setErr(null)
       const res = await fetch(`/api/rooms/${joiningId}/join`, {
         method: 'POST',
         headers: {
@@ -49,6 +58,10 @@ export default function HomePage() {
         body: JSON.stringify({ name }),
       })
       if (res.ok) router.push(`/room/${joiningId}`)
+      else {
+        const text = await res.text().catch(() => '')
+        setErr(text || 'Odaya katılamadı. Sunucu hatası.')
+      }
     } finally {
       setBusy(false)
     }
@@ -62,6 +75,9 @@ export default function HomePage() {
       </header>
       <section className="grid gap-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
         <h2 className="text-lg font-medium">Oda Oluştur</h2>
+        {err && (
+          <div className="rounded border border-red-700 bg-red-900/20 p-2 text-sm text-red-300">{err}</div>
+        )}
         <div className="grid gap-3 sm:grid-cols-3">
           <input
             placeholder="İsminiz"
