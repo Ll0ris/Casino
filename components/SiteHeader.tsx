@@ -47,8 +47,8 @@ export default function SiteHeader() {
   }, [])
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-40 w-full bg-emerald-900 text-sm shadow-sm">
-      <div className="mx-auto flex max-w-6xl items-center justify-between">
+    <header className="fixed left-0 right-0 top-0 z-40 w-full bg-emerald-900 py-5 text-sm shadow-sm">
+      <div className="flex w-full items-center justify-between px-5">
         <button onClick={() => router.push('/')} className="flex items-center gap-2">
           <img src="/assets/images/logo.png" alt="logo" className="h-10 w-10 rounded" onError={(e)=>{ (e.currentTarget as HTMLImageElement).style.display='none' }} />
           <span className="text-base font-semibold tracking-wide">Virtual Casino</span>

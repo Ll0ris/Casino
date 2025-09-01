@@ -5,8 +5,7 @@ import { getSupabaseClient } from '@/lib/supabaseClient'
 
 export default function HomePage() {
   const router = useRouter()
-  const [name, setName] = useState('')
-  const [joiningId, setJoiningId] = useState('')
+  const [username, setUsername] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [authEmail, setAuthEmail] = useState('')
@@ -14,39 +13,34 @@ export default function HomePage() {
   const [authPassword, setAuthPassword] = useState('')
   const [authMsg, setAuthMsg] = useState<string | null>(null)
   const [authUserId, setAuthUserId] = useState<string | null>(null)
-  const [balance, setBalance] = useState<number | null>(null)
   const [mode, setMode] = useState<'landing'|'login'|'signup'|'guest'>('landing')
+  const [guestName, setGuestName] = useState('')
+  const [guestRoom, setGuestRoom] = useState('')
 
   useEffect(() => {
-    if (!localStorage.getItem('playerToken')) {
-      localStorage.setItem('playerToken', crypto.randomUUID())
-    }
+    if (!localStorage.getItem('playerToken')) localStorage.setItem('playerToken', crypto.randomUUID())
     const uid = localStorage.getItem('authUserId')
     setAuthUserId(uid)
     if (uid) {
-      fetch('/api/profile/balance', { headers: { 'x-user-id': uid } })
-        .then(r=>r.json()).then(d=>setBalance(Number(d?.balance||0))).catch(()=>{})
+      fetch('/api/profile', { headers: { 'x-user-id': uid } })
+        .then(r=>r.json()).then(p=> setUsername(p?.username || p?.email?.split('@')[0] || ''))
+        .catch(()=>{})
     }
   }, [])
 
   const onCreate = async () => {
-    if (!name.trim()) return
+    const name = username || localStorage.getItem('guestName') || ''
+    if (!name) return
     try {
       setBusy(true); setErr(null)
-      const res = await fetch('/api/rooms', { method: 'POST', headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken')||'', 'x-user-id': localStorage.getItem('authUserId')||'' }, body: JSON.stringify({ name }) })
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken')||'', 'x-user-id': localStorage.getItem('authUserId')||'' },
+        body: JSON.stringify({ name })
+      })
       const data = await res.json().catch(()=>null)
       if (res.ok && data?.roomId) router.push(`/room/${data.roomId}`)
       else setErr('Oda oluşturulamadı.')
-    } finally { setBusy(false) }
-  }
-
-  const onJoin = async () => {
-    if (!name.trim() || !joiningId.trim()) return
-    try {
-      setBusy(true); setErr(null)
-      const res = await fetch(`/api/rooms/${joiningId}/join`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken')||'', 'x-user-id': localStorage.getItem('authUserId')||'' }, body: JSON.stringify({ name }) })
-      if (res.ok) router.push(`/room/${joiningId}`)
-      else setErr('Odaya katılamadı.')
     } finally { setBusy(false) }
   }
 
@@ -78,13 +72,14 @@ export default function HomePage() {
                 <button className="btn-primary" onClick={async()=>{
                   setAuthMsg(null)
                   try {
-                    const supabase = getSupabaseClient(); if (!supabase) throw new Error('Supabase env missing')
-                    const { data, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
+                    const sb = getSupabaseClient(); if (!sb) throw new Error('Supabase env missing')
+                    const { data, error } = await sb.auth.signUp({ email: authEmail, password: authPassword })
                     if (error) throw error
                     const userId = data.user?.id
                     if (userId) {
                       await fetch('/api/profile', { method:'POST', headers: { 'Content-Type':'application/json', 'x-user-id': userId }, body: JSON.stringify({ email: authEmail, username: authUsername || authEmail.split('@')[0] }) })
-                      localStorage.setItem('authUserId', userId); setAuthUserId(userId); router.refresh()
+                      localStorage.setItem('authUserId', userId); setAuthUserId(userId); setUsername(authUsername || authEmail.split('@')[0]);
+                      router.refresh()
                     }
                   } catch (e:any) { setAuthMsg(e?.message || 'Kayıt başarısız') }
                 }}>Kaydol</button>
@@ -101,16 +96,18 @@ export default function HomePage() {
                 <button className="btn-secondary" onClick={()=>setMode('landing')}>Geri</button>
                 <button className="btn-primary" onClick={async()=>{
                   setAuthMsg(null)
-                  try { const supabase = getSupabaseClient(); if (!supabase) throw new Error('Supabase env missing')
-                    const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword })
+                  try { const sb = getSupabaseClient(); if (!sb) throw new Error('Supabase env missing')
+                    const { data, error } = await sb.auth.signInWithPassword({ email: authEmail, password: authPassword })
                     if (error) throw error
                     const userId = data.user?.id
                     if (userId) {
                       localStorage.setItem('authUserId', userId); setAuthUserId(userId)
-                      // ensure profile row exists
                       const prof = await fetch('/api/profile', { headers: { 'x-user-id': userId } }).then(r=>r.json()).catch(()=>null)
                       if (!prof?.user_id) {
                         await fetch('/api/profile', { method:'POST', headers: { 'Content-Type':'application/json', 'x-user-id': userId }, body: JSON.stringify({ email: authEmail, username: authEmail.split('@')[0] }) })
+                        setUsername(authEmail.split('@')[0])
+                      } else {
+                        setUsername(prof?.username || prof?.email?.split('@')[0] || '')
                       }
                       router.refresh()
                     }
@@ -123,32 +120,46 @@ export default function HomePage() {
           {mode === 'guest' && (
             <div className="grid gap-3">
               <div className="flex items-center gap-2 text-zinc-300"><i className="fa-solid fa-user-secret"/> Misafir Girişi (500$ deneme)</div>
-              <input className="input" placeholder="Kullanıcı adı" value={name} onChange={(e)=>setName(e.target.value)} />
-              <input className="input" placeholder="Oda Kodu" value={joiningId} onChange={(e)=>setJoiningId(e.target.value)} />
+              <input className="input" placeholder="Kullanıcı adı" value={guestName} onChange={(e)=>setGuestName(e.target.value)} />
+              <input className="input" placeholder="Oda Kodu" value={guestRoom} onChange={(e)=>setGuestRoom(e.target.value)} />
               <div className="flex gap-2">
                 <button className="btn-secondary" onClick={()=>setMode('landing')}>Geri</button>
-                <button className="btn-primary" disabled={!name.trim()||!joiningId.trim()} onClick={async()=>{
-                  localStorage.setItem('guestName', name.trim())
+                <button className="btn-primary" disabled={!guestName.trim()||!guestRoom.trim()} onClick={async()=>{
+                  localStorage.setItem('guestName', guestName.trim())
                   if (!localStorage.getItem('guestBalance')) localStorage.setItem('guestBalance','500')
-                  const res = await fetch(`/api/rooms/${joiningId}/join`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken')||'' }, body: JSON.stringify({ name }) })
-                  if (res.ok) router.push(`/room/${joiningId}`)
+                  const res = await fetch(`/api/rooms/${guestRoom}/join`, { method:'POST', headers: { 'Content-Type':'application/json', 'x-player-token': localStorage.getItem('playerToken')||'' }, body: JSON.stringify({ name: guestName }) })
+                  if (res.ok) router.push(`/room/${guestRoom}`)
                 }}>Katıl</button>
               </div>
             </div>
           )}
         </section>
       ) : (
-        <section className="grid gap-6">
-          {err && <div className="mb-3 rounded border border-red-700 bg-red-900/20 p-2 text-sm text-red-300">{err}</div>}
-          <button
-            onClick={onCreate}
-            className="grid place-items-center gap-2 rounded-xl bg-white p-10 text-emerald-900 shadow hover:shadow-lg transition-shadow"
-          >
-            <div className="text-4xl">🃏</div>
-            <div className="text-xl font-semibold">Blackjack Oyna</div>
-          </button>
+        <section className="mt-[300px] grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
+          {err && <div className="col-span-full mb-3 rounded border border-red-700 bg-red-900/20 p-2 text-sm text-red-300">{err}</div>}
+          <GameCard label="Blackjack Oyna" emoji="🃏" onClick={onCreate} />
+          <GameCard label="Joker (yakında)" emoji="🃟" disabled />
+          <GameCard label="Baccarat (yakında)" emoji="🃑" disabled />
+          <GameCard label="Rulet (yakında)" emoji="🎯" disabled />
+          <GameCard label="Blöf (yakında)" emoji="🂠" disabled />
+          <GameCard label="Slots (yakında)" emoji="🎰" disabled />
         </section>
       )}
     </main>
   )
 }
+
+function GameCard({ label, emoji, onClick, disabled }: { label: string; emoji: string; onClick?: () => void; disabled?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`grid place-items-center gap-2 rounded-xl bg-white p-10 text-emerald-900 shadow transition-shadow hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-60`}
+    >
+      <div className="text-4xl">{emoji}</div>
+      <div className="text-center text-lg font-semibold">{label}</div>
+      {disabled && <div className="text-xs text-zinc-500">Yakında</div>}
+    </button>
+  )
+}
+
