@@ -84,6 +84,7 @@ export function startRound(game: Game): Game {
     value: 0,
     busted: false,
     stood: false,
+    doubled: false,
   })) as Player[]
   const dealer: Dealer = { cards: [], value: 0 }
 
@@ -154,6 +155,25 @@ export function playerStand(game: Game, playerId: string): Game {
   }
 }
 
+export function playerDoubleDown(game: Game, playerId: string): Game {
+  if (game.status !== 'in_round' || game.turnPlayerId !== playerId) return game
+  const players = game.players.map((p) => ({ ...p }))
+  const me = players.find((p) => p.id === playerId)!
+  // Allow only on exactly two visible cards and not already doubled
+  if (!me || me.doubled || me.cards.filter((c) => !c.hidden).length !== 2) return game
+  const deck = newDeck()
+  me.doubled = true
+  me.cards = me.cards.concat(deck.pop()!)
+  me.value = handValue(me.cards)
+  me.stood = true
+  const next = nextTurn(players, playerId)
+  if (next) {
+    return { ...game, players, turnPlayerId: next, updatedAt: Date.now() }
+  }
+  const { dealer, msg } = dealerFinish(game.dealer, players)
+  return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, updatedAt: Date.now(), message: msg }
+}
+
 function dealerFinish(dealer: Dealer, players: Player[]) {
   const reveal: Card[] = dealer.cards.map((c) => ({ ...c, hidden: false }))
   let value = handValue(reveal)
@@ -181,6 +201,23 @@ function summaryMessage(dealer: Dealer, players: Player[]): string {
     parts.push(`${p.name}: ${res}`)
   }
   return parts.join(' • ')
+}
+
+export function computePayouts(dealer: Dealer, players: Player[]): Array<{ playerId: string; delta: number }> {
+  const results: Array<{ playerId: string; delta: number }> = []
+  const dealerBust = dealer.value > 21
+  for (const p of players) {
+    const base = Math.max(0, p.bet || 0)
+    const wager = p.doubled ? base * 2 : base
+    let delta = 0
+    if (p.busted) delta = -wager
+    else if (dealerBust) delta = wager
+    else if (p.value > dealer.value) delta = wager
+    else if (p.value < dealer.value) delta = -wager
+    else delta = 0
+    results.push({ playerId: p.id, delta })
+  }
+  return results
 }
 
 function nextTurn(players: Player[], currentId: string | null): string | null {
@@ -211,6 +248,8 @@ export function toClient(game: Game, tokenHash: string) {
       value: p.value,
       busted: p.busted,
       stood: p.stood,
+      bet: p.bet,
+      doubled: p.doubled,
     })),
     dealer: { cards: dealerCards, value: handValue(dealerCards) },
     status: game.status,
@@ -224,6 +263,8 @@ export function toClient(game: Game, tokenHash: string) {
           value: me.value,
           busted: me.busted,
           stood: me.stood,
+          bet: me.bet,
+          doubled: me.doubled,
         }
       : null,
     message: game.message,

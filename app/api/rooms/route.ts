@@ -10,10 +10,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const name = (body?.name || '').toString().trim().slice(0, 32)
     const playerToken = req.headers.get('x-player-token') || (await req.cookies.get('playerToken')?.value) || body?.playerToken || ''
+    const accountId = (req.headers.get('x-user-id') || body?.accountId || '').toString() || undefined
     if (!name || !playerToken) {
       return Response.json({ error: 'name and player token required' }, { status: 400 })
     }
-    const { roomId } = await createRoom(name, playerToken)
+    const { roomId } = await createRoom(name, playerToken, accountId)
     const store = getStore()
     const game = await store.get(roomId)
     const state = game ? toClient(game, hashToken(playerToken)) : null

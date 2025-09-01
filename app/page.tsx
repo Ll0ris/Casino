@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
+import { getSupabaseClient } from '@/lib/supabaseClient'
 
 export default function HomePage() {
   const router = useRouter()
@@ -9,6 +10,10 @@ export default function HomePage() {
   const [joiningId, setJoiningId] = useState('')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [authEmail, setAuthEmail] = useState('')
+  const [authUsername, setAuthUsername] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authMsg, setAuthMsg] = useState<string | null>(null)
 
   useEffect(() => {
     // Ensure we have a persistent player token
@@ -28,6 +33,7 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
           'x-player-token': localStorage.getItem('playerToken') || '',
+          'x-user-id': localStorage.getItem('authUserId') || '',
         },
         body: JSON.stringify({ name }),
       })
@@ -54,6 +60,7 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
           'x-player-token': localStorage.getItem('playerToken') || '',
+          'x-user-id': localStorage.getItem('authUserId') || '',
         },
         body: JSON.stringify({ name }),
       })
@@ -78,8 +85,55 @@ export default function HomePage() {
         </p>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid gap-6 sm:grid-cols-3">
         <section className="card">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-xl"></span>
+            <h2 className="text-lg font-medium">Giri / Kaydol</h2>
+          </div>
+          <div className="grid gap-3">
+            <input className="input" placeholder="E-posta" value={authEmail} onChange={(e)=>setAuthEmail(e.target.value)} />
+            <input className="input" placeholder="Kullanc ad" value={authUsername} onChange={(e)=>setAuthUsername(e.target.value)} />
+            <input className="input" placeholder="ifre" type="password" value={authPassword} onChange={(e)=>setAuthPassword(e.target.value)} />
+            <div className="flex gap-2">
+              <button className="btn-secondary" onClick={async()=>{
+                setAuthMsg(null)
+                try {
+                  const supabase = getSupabaseClient()
+                  if (!supabase) throw new Error('Supabase env missing')
+                  const { data, error } = await supabase.auth.signInWithPassword({ email: authEmail, password: authPassword })
+                  if (error) throw error
+                  const userId = data.user?.id
+                  if (userId) {
+                    localStorage.setItem('authUserId', userId)
+                    setAuthMsg('Giri baarl')
+                  }
+                } catch (e:any) {
+                  setAuthMsg(e?.message || 'Giri baarsz')
+                }
+              }}>Giri Yap</button>
+              <button className="btn-primary" onClick={async()=>{
+                setAuthMsg(null)
+                try {
+                  const supabase = getSupabaseClient()
+                  if (!supabase) throw new Error('Supabase env missing')
+                  const { data, error } = await supabase.auth.signUp({ email: authEmail, password: authPassword })
+                  if (error) throw error
+                  const userId = data.user?.id
+                  if (userId) {
+                    await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type':'application/json', 'x-user-id': userId }, body: JSON.stringify({ email: authEmail, username: authUsername }) })
+                    localStorage.setItem('authUserId', userId)
+                    setAuthMsg('Kayt baarl. E-posta doerulamas gerekebilir.')
+                  }
+                } catch (e:any) {
+                  setAuthMsg(e?.message || 'Kayt baarsz')
+                }
+              }}>Kaydol</button>
+            </div>
+            {authMsg && <div className="text-xs text-zinc-400">{authMsg}</div>}
+          </div>
+        </section>
+        <section className="card sm:col-span-2">
           <div className="mb-4 flex items-center gap-2">
             <span className="text-xl">🃏</span>
             <h2 className="text-lg font-medium">Oda Oluştur</h2>
@@ -104,7 +158,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="card">
+        <section className="card sm:col-span-2">
           <div className="mb-4 flex items-center gap-2">
             <span className="text-xl">🎲</span>
             <h2 className="text-lg font-medium">Odaya Katıl</h2>

@@ -43,6 +43,27 @@ export default function GameTable({
 }) {
   const me = state.me
   const isMyTurn = state.turnPlayerId === me?.id
+  const canDouble = state.status === 'in_round' && isMyTurn && (me?.cards?.filter((c)=>!c.hidden).length === 2) && !me?.doubled
+  const setBet = async (bet: number) => {
+    await fetch(`/api/rooms/${roomId}/bet`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-player-token': localStorage.getItem('playerToken') || '',
+      },
+      body: JSON.stringify({ bet })
+    })
+  }
+  const onDouble = async () => {
+    await fetch(`/api/rooms/${roomId}/action`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-player-token': localStorage.getItem('playerToken') || '',
+      },
+      body: JSON.stringify({ action: 'double' })
+    })
+  }
 
   return (
     <div className="grid gap-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
@@ -81,7 +102,10 @@ export default function GameTable({
                   {p.busted && <span className="rounded bg-red-600/20 px-1.5 py-0.5 text-red-300">Bust</span>}
                   {p.stood && <span className="rounded bg-sky-600/20 px-1.5 py-0.5 text-sky-300">Stand</span>}
                 </div>
-                <span className="text-zinc-400">Puan: {p.value}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-zinc-400">Bet: {p.bet ?? 0}</span>
+                  <span className="text-zinc-400">Puan: {p.value}</span>
+                </div>
               </div>
               <div className="mt-2">
                 <Hand cards={p.cards} />
@@ -91,7 +115,7 @@ export default function GameTable({
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {state.isHost && state.status === 'waiting' && (
           <button
             onClick={() => onAction('start')}
@@ -122,6 +146,14 @@ export default function GameTable({
             >
               Stand
             </button>
+            {canDouble && (
+              <button
+                onClick={onDouble}
+                className="rounded-md bg-amber-600 px-3 py-2 text-sm font-medium hover:bg-amber-500"
+              >
+                Double Down
+              </button>
+            )}
           </>
         )}
         <button
@@ -135,6 +167,21 @@ export default function GameTable({
       {state.message && (
         <div className="rounded-md border border-amber-700 bg-amber-950/40 p-3 text-sm text-amber-200">
           {state.message}
+        </div>
+      )}
+
+      {me && (state.status === 'waiting' || state.status === 'round_over') && (
+        <div className="flex items-center gap-2 text-sm text-zinc-300">
+          <span>Bahisin:</span>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            defaultValue={me.bet ?? 0}
+            onBlur={(e) => setBet(parseInt(e.target.value || '0'))}
+            className="w-24 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 outline-none focus:border-zinc-600"
+          />
+          <span className="text-xs text-zinc-500">(Eli başlatmadan önce belirle)</span>
         </div>
       )}
     </div>

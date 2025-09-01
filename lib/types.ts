@@ -7,11 +7,14 @@ export type Player = {
   id: string
   name: string
   tokenHash: string
+  accountId?: string
   cards: Card[]
   value: number
   busted: boolean
   stood: boolean
   isHost?: boolean
+  bet?: number
+  doubled?: boolean
 }
 
 export type Dealer = {
@@ -31,7 +34,7 @@ export type Game = {
   message?: string
 }
 
-export type ClientPlayer = Pick<Player, 'id' | 'name' | 'cards' | 'value' | 'busted' | 'stood'>
+export type ClientPlayer = Pick<Player, 'id' | 'name' | 'cards' | 'value' | 'busted' | 'stood' | 'bet' | 'doubled'>
 export type ClientDealer = Pick<Dealer, 'cards' | 'value'>
 
 export type ClientGameState = {
@@ -44,4 +47,3 @@ export type ClientGameState = {
   me: ClientPlayer | null
   message?: string
 }
-

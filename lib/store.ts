@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Game, Player } from './types'
-import { createGame, joinGame, leaveGame, playerHit, playerStand, startRound } from './game'
+import { createGame, joinGame, leaveGame, playerHit, playerStand, startRound, playerDoubleDown, computePayouts } from './game'
 
 const SUPABASE_URL = process.env.SUPABASE_URL
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
@@ -72,13 +72,14 @@ export function hashToken(token: string): string {
   return `h${h >>> 0}`
 }
 
-export async function createRoom(name: string, playerToken: string) {
+export async function createRoom(name: string, playerToken: string, accountId?: string) {
   const store = getStore()
   const id = randomId()
   const host: Player = {
     id: randomId(),
     name,
     tokenHash: hashToken(playerToken),
+    accountId,
     cards: [],
     value: 0,
     busted: false,
@@ -90,7 +91,7 @@ export async function createRoom(name: string, playerToken: string) {
   return { roomId: id }
 }
 
-export async function ensureJoined(roomId: string, name: string, playerToken: string) {
+export async function ensureJoined(roomId: string, name: string, playerToken: string, accountId?: string, bet?: number) {
   const store = getStore()
   const g = (await store.get(roomId))
   if (!g) return null
@@ -101,10 +102,12 @@ export async function ensureJoined(roomId: string, name: string, playerToken: st
     id: randomId(),
     name,
     tokenHash,
+    accountId,
     cards: [],
     value: 0,
     busted: false,
     stood: false,
+    bet: Math.max(0, Number(bet || 0)),
   }
   const next = joinGame(g, newPlayer)
   await store.set(next)
@@ -144,6 +147,7 @@ export async function hit(roomId: string, playerToken: string) {
   if (!me) return g
   const next = playerHit(g, me.id)
   await store.set(next)
+  if (next.status === 'round_over') await settleBalances(next)
   return next
 }
 
@@ -156,7 +160,53 @@ export async function stand(roomId: string, playerToken: string) {
   if (!me) return g
   const next = playerStand(g, me.id)
   await store.set(next)
+  if (next.status === 'round_over') await settleBalances(next)
   return next
+}
+
+export async function doubleDown(roomId: string, playerToken: string) {
+  const store = getStore()
+  const g = await store.get(roomId)
+  if (!g) return null
+  const tokenHash = hashToken(playerToken)
+  const me = g.players.find((p) => p.tokenHash === tokenHash)
+  if (!me) return g
+  const next = playerDoubleDown(g, me.id)
+  await store.set(next)
+  if (next.status === 'round_over') await settleBalances(next)
+  return next
+}
+
+export async function setBet(roomId: string, playerToken: string, bet: number) {
+  const store = getStore()
+  const g = await store.get(roomId)
+  if (!g) return null
+  const tokenHash = hashToken(playerToken)
+  const players = g.players.map((p) => (p.tokenHash === tokenHash ? { ...p, bet: Math.max(0, Number(bet || 0)) } : p))
+  const next = { ...g, players, updatedAt: Date.now() }
+  await store.set(next)
+  return next
+}
+
+async function settleBalances(game: Game) {
+  try {
+    if (!(SUPABASE_URL && SUPABASE_ANON_KEY)) return
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    const results = computePayouts(game.dealer, game.players)
+    for (const r of results) {
+      const p = game.players.find((x) => x.id === r.playerId)
+      if (!p?.accountId) continue
+      // Read then write (simple and clear for prototype)
+      const { data: prof } = await supabase.from('profiles').select('balance').eq('user_id', p.accountId).single()
+      const current = Number(prof?.balance || 0)
+      const next = current + Number(r.delta || 0)
+      if (prof) {
+        await supabase.from('profiles').update({ balance: next }).eq('user_id', p.accountId)
+      }
+    }
+  } catch (e: any) {
+    console.error('[settleBalances]', e?.message || e)
+  }
 }
 
 function randomId() {

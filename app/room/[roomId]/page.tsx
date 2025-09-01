@@ -77,6 +77,7 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
   }
 
   const [pendingJoinName, setPendingJoinName] = useState('')
+  const [pendingJoinBet, setPendingJoinBet] = useState<number>(10)
   const onJoinDirect = async () => {
     if (!pendingJoinName.trim()) return
     const res = await fetch(`/api/rooms/${roomId}/join`, {
@@ -84,8 +85,9 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
       headers: {
         'Content-Type': 'application/json',
         'x-player-token': playerToken,
+        'x-user-id': localStorage.getItem('authUserId') || '',
       },
-      body: JSON.stringify({ name: pendingJoinName.trim() }),
+      body: JSON.stringify({ name: pendingJoinName.trim(), bet: pendingJoinBet }),
     })
     if (res.ok) {
       setPendingJoinName('')
@@ -158,6 +160,15 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
               value={pendingJoinName}
               onChange={(e) => setPendingJoinName(e.target.value)}
               className="rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-sm outline-none focus:border-zinc-600"
+            />
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={pendingJoinBet}
+              onChange={(e) => setPendingJoinBet(parseInt(e.target.value || '0'))}
+              className="w-24 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-sm outline-none focus:border-zinc-600"
+              placeholder="Bahis"
             />
             <button
               onClick={onJoinDirect}

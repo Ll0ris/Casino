@@ -9,12 +9,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ roo
   try {
     const body = await req.json().catch(() => ({}))
     const name = (body?.name || '').toString().trim().slice(0, 32)
+    const bet = Number(body?.bet || 0)
     const playerToken = req.headers.get('x-player-token') || body?.playerToken || ''
+    const accountId = (req.headers.get('x-user-id') || body?.accountId || '').toString() || undefined
     if (!name || !playerToken) {
       return Response.json({ error: 'name and player token required' }, { status: 400 })
     }
     const { roomId } = await params
-    const g = await ensureJoined(roomId, name, playerToken)
+    const g = await ensureJoined(roomId, name, playerToken, accountId, bet)
     if (!g) return Response.json({ error: 'not found' }, { status: 404 })
     const state = toClient(g, hashToken(playerToken))
     return Response.json(state)
