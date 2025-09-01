@@ -192,7 +192,8 @@ async function settleBalances(game: Game) {
   try {
     if (!(SUPABASE_URL && SUPABASE_ANON_KEY)) return
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    const results = computePayouts(game.dealer, game.players)
+    const dealerBJ = game.dealer.cards.length === 2 && game.dealer.value === 21
+    const results = computePayouts(game.dealer, game.players, dealerBJ)
     for (const r of results) {
       const p = game.players.find((x) => x.id === r.playerId)
       if (!p?.accountId) continue
@@ -207,6 +208,24 @@ async function settleBalances(game: Game) {
   } catch (e: any) {
     console.error('[settleBalances]', e?.message || e)
   }
+}
+
+export async function insurance(roomId: string, playerToken: string, amount: number) {
+  const store = getStore()
+  const g = await store.get(roomId)
+  if (!g) return null
+  const tokenHash = hashToken(playerToken)
+  const players = g.players.map((p) => {
+    if (p.tokenHash === tokenHash) {
+      const cap = Math.max(0, (p.bet || 0) / 2)
+      const val = Math.max(0, Math.min(Number(amount || 0), cap))
+      return { ...p, insurance: val }
+    }
+    return p
+  })
+  const next = { ...g, players, updatedAt: Date.now() }
+  await store.set(next)
+  return next
 }
 
 function randomId() {

@@ -175,17 +175,21 @@ export function playerDoubleDown(game: Game, playerId: string): Game {
 }
 
 function dealerFinish(dealer: Dealer, players: Player[]) {
-  const reveal: Card[] = dealer.cards.map((c) => ({ ...c, hidden: false }))
-  let value = handValue(reveal)
-  // Draw until 17+
-  while (value < 17) {
-    const deck = newDeck()
-    reveal.push(deck.pop()!)
-    value = handValue(reveal)
+  const initial: Card[] = dealer.cards.map((c) => ({ ...c, hidden: false }))
+  let value = handValue(initial)
+  const initialBlackjack = initial.length === 2 && value === 21
+  const reveal: Card[] = [...initial]
+  if (!initialBlackjack) {
+    // Draw until 17+
+    while (value < 17) {
+      const deck = newDeck()
+      reveal.push(deck.pop()!)
+      value = handValue(reveal)
+    }
   }
   const finalDealer = { cards: reveal, value }
   const msg = summaryMessage(finalDealer, players)
-  return { dealer: finalDealer, msg }
+  return { dealer: finalDealer, msg, dealerBlackjack: initialBlackjack }
 }
 
 function summaryMessage(dealer: Dealer, players: Player[]): string {
@@ -203,18 +207,31 @@ function summaryMessage(dealer: Dealer, players: Player[]): string {
   return parts.join(' • ')
 }
 
-export function computePayouts(dealer: Dealer, players: Player[]): Array<{ playerId: string; delta: number }> {
+export function computePayouts(dealer: Dealer, players: Player[], dealerBlackjack?: boolean): Array<{ playerId: string; delta: number }> {
   const results: Array<{ playerId: string; delta: number }> = []
   const dealerBust = dealer.value > 21
   for (const p of players) {
     const base = Math.max(0, p.bet || 0)
     const wager = p.doubled ? base * 2 : base
     let delta = 0
-    if (p.busted) delta = -wager
-    else if (dealerBust) delta = wager
-    else if (p.value > dealer.value) delta = wager
-    else if (p.value < dealer.value) delta = -wager
-    else delta = 0
+    if (dealerBlackjack) {
+      // Insurance resolves
+      const ins = Math.max(0, p.insurance || 0)
+      delta += ins > 0 ? ins * 2 : 0
+      // Main bet: push if player also has 2-card 21, else lose
+      const playerBlackjack = p.cards.filter((c) => !c.hidden).length === 2 && p.value === 21
+      if (!playerBlackjack) delta -= wager
+    } else {
+      // Normal resolution
+      const ins = Math.max(0, p.insurance || 0)
+      // Insurance loses when dealer doesn't have BJ
+      delta -= ins
+      if (p.busted) delta += -wager
+      else if (dealerBust) delta += wager
+      else if (p.value > dealer.value) delta += wager
+      else if (p.value < dealer.value) delta += -wager
+      else delta += 0
+    }
     results.push({ playerId: p.id, delta })
   }
   return results
@@ -250,6 +267,7 @@ export function toClient(game: Game, tokenHash: string) {
       stood: p.stood,
       bet: p.bet,
       doubled: p.doubled,
+      insurance: p.insurance,
     })),
     dealer: { cards: dealerCards, value: handValue(dealerCards) },
     status: game.status,
@@ -265,6 +283,7 @@ export function toClient(game: Game, tokenHash: string) {
           stood: me.stood,
           bet: me.bet,
           doubled: me.doubled,
+          insurance: me.insurance,
         }
       : null,
     message: game.message,

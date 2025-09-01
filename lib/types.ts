@@ -15,6 +15,7 @@ export type Player = {
   isHost?: boolean
   bet?: number
   doubled?: boolean
+  insurance?: number
 }
 
 export type Dealer = {
@@ -34,7 +35,7 @@ export type Game = {
   message?: string
 }
 
-export type ClientPlayer = Pick<Player, 'id' | 'name' | 'cards' | 'value' | 'busted' | 'stood' | 'bet' | 'doubled'>
+export type ClientPlayer = Pick<Player, 'id' | 'name' | 'cards' | 'value' | 'busted' | 'stood' | 'bet' | 'doubled' | 'insurance'>
 export type ClientDealer = Pick<Dealer, 'cards' | 'value'>
 
 export type ClientGameState = {

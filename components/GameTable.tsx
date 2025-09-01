@@ -44,6 +44,18 @@ export default function GameTable({
   const me = state.me
   const isMyTurn = state.turnPlayerId === me?.id
   const canDouble = state.status === 'in_round' && isMyTurn && (me?.cards?.filter((c)=>!c.hidden).length === 2) && !me?.doubled
+  const dealerAceUp = state.dealer.cards[0] && !state.dealer.cards[0].hidden && state.dealer.cards[0].rank === 'A'
+  const takeInsurance = async (amount?: number) => {
+    const val = amount ?? Math.max(0, (me?.bet || 0) / 2)
+    await fetch(`/api/rooms/${roomId}/insurance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-player-token': localStorage.getItem('playerToken') || '',
+      },
+      body: JSON.stringify({ amount: val })
+    })
+  }
   const setBet = async (bet: number) => {
     await fetch(`/api/rooms/${roomId}/bet`, {
       method: 'POST',
@@ -104,6 +116,9 @@ export default function GameTable({
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-zinc-400">Bet: {p.bet ?? 0}</span>
+                  {p.insurance ? (
+                    <span className="text-zinc-400">Ins: {p.insurance}</span>
+                  ) : null}
                   <span className="text-zinc-400">Puan: {p.value}</span>
                 </div>
               </div>
@@ -182,6 +197,14 @@ export default function GameTable({
             className="w-24 rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 outline-none focus:border-zinc-600"
           />
           <span className="text-xs text-zinc-500">(Eli başlatmadan önce belirle)</span>
+        </div>
+      )}
+
+      {me && state.status === 'in_round' && dealerAceUp && !me.insurance && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-amber-300">
+          <span>Insurance mevcut (Dealer Ace).</span>
+          <button onClick={()=>takeInsurance()} className="rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium hover:bg-amber-500">Yarım Bet Al</button>
+          <span className="text-xs text-amber-200/80">(Max: {(me.bet||0)/2})</span>
         </div>
       )}
     </div>
