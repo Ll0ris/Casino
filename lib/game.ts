@@ -73,10 +73,12 @@ export function createGame(id: string, host: Player): Game {
     dealer: { cards: [], value: 0 },
     status: 'waiting',
     turnPlayerId: null,
+    turnExpiresAt: null,
     updatedAt: Date.now(),
     message: undefined,
     settings: { deckCount: 1, shuffleAt: 35 },
     shoe: [],
+    lastSeen: {},
   }
 }
 
@@ -151,6 +153,7 @@ export function startRound(game: Game): Game {
     dealer,
     status: 'in_round',
     turnPlayerId: first,
+    turnExpiresAt: first ? Date.now() + 15000 : null,
     updatedAt: Date.now(),
     message: needShuffle ? 'Deste karıştırıldı' : undefined,
     shoe,
@@ -171,15 +174,16 @@ export function playerHit(game: Game, playerId: string): Game {
     const next = nextTurn(players, playerId)
     if (next) {
       turnPlayerId = next
+      return { ...game, players, status: game.status, turnPlayerId, turnExpiresAt: Date.now() + 15000, updatedAt: Date.now(), message, shoe }
     } else {
       // Dealer reveals and plays
       const { dealer, msg, shoe: shoeNext } = dealerFinish(game.dealer, players, shoe)
       shoe = shoeNext
       message = msg
-      return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, updatedAt: Date.now(), message, shoe }
+      return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, turnExpiresAt: null, updatedAt: Date.now(), message, shoe }
     }
   }
-  return { ...game, players, status: game.status, turnPlayerId, updatedAt: Date.now(), message, shoe }
+  return { ...game, players, status: game.status, turnPlayerId, turnExpiresAt: game.turnExpiresAt, updatedAt: Date.now(), message, shoe }
 }
 
 export function playerStand(game: Game, playerId: string): Game {
@@ -190,7 +194,7 @@ export function playerStand(game: Game, playerId: string): Game {
   me.stood = true
   const next = nextTurn(players, playerId)
   if (next) {
-    return { ...game, players, turnPlayerId: next, updatedAt: Date.now(), shoe }
+    return { ...game, players, turnPlayerId: next, turnExpiresAt: Date.now() + 15000, updatedAt: Date.now(), shoe }
   }
   const { dealer, msg, shoe: shoeNext } = dealerFinish(game.dealer, players, shoe)
   shoe = shoeNext
@@ -200,6 +204,7 @@ export function playerStand(game: Game, playerId: string): Game {
     dealer,
     status: 'round_over',
     turnPlayerId: null,
+    turnExpiresAt: null,
     updatedAt: Date.now(),
     message: msg,
     shoe,
@@ -220,11 +225,11 @@ export function playerDoubleDown(game: Game, playerId: string): Game {
   me.stood = true
   const next = nextTurn(players, playerId)
   if (next) {
-    return { ...game, players, turnPlayerId: next, updatedAt: Date.now(), shoe }
+    return { ...game, players, turnPlayerId: next, turnExpiresAt: Date.now() + 15000, updatedAt: Date.now(), shoe }
   }
   const { dealer, msg, shoe: shoeNext } = dealerFinish(game.dealer, players, shoe)
   shoe = shoeNext
-  return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, updatedAt: Date.now(), message: msg, shoe }
+  return { ...game, players, dealer, status: 'round_over', turnPlayerId: null, turnExpiresAt: null, updatedAt: Date.now(), message: msg, shoe }
 }
 
 export function playerSplit(game: Game, playerId: string): Game {
@@ -258,7 +263,7 @@ export function playerSplit(game: Game, playerId: string): Game {
   second.busted = second.value > 21
 
   players.splice(idx, 1, first, second)
-  return { ...game, players, turnPlayerId: first.id, updatedAt: Date.now() }
+  return { ...game, players, turnPlayerId: first.id, turnExpiresAt: Date.now() + 15000, updatedAt: Date.now() }
 }
 
 function dealerFinish(dealer: Dealer, players: Player[], shoe: Card[]) {
@@ -363,6 +368,7 @@ export function toClient(game: Game, tokenHash: string) {
     dealer: { cards: dealerCards, value: handValue(dealerCards) },
     status: game.status,
     turnPlayerId: game.turnPlayerId,
+    turnExpiresAt: (game as any).turnExpiresAt ?? null,
     isHost: Boolean(me?.isHost),
     me: me
       ? {

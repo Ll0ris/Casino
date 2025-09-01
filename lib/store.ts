@@ -97,6 +97,8 @@ export async function ensureJoined(roomId: string, name: string, playerToken: st
   const g = (await store.get(roomId))
   if (!g) return null
   const tokenHash = hashToken(playerToken)
+  g.lastSeen = g.lastSeen || {}
+  g.lastSeen[tokenHash] = Date.now()
   const exists = g.players.find((p) => p.tokenHash === tokenHash)
   if (exists) return g
   const newPlayer: Player = {
@@ -124,6 +126,10 @@ export async function leave(roomId: string, playerToken: string) {
   const me = g.players.find((p) => p.tokenHash === tokenHash)
   if (!me) return g
   const next = leaveGame(g, me.id)
+  if (next.players.length === 0) {
+    await store.remove(roomId)
+    return null
+  }
   await store.set(next)
   return next
 }
@@ -243,6 +249,59 @@ export async function insurance(roomId: string, playerToken: string, amount: num
   })
   const next = { ...g, players, updatedAt: Date.now() }
   await store.set(next)
+  return next
+}
+
+function purgeStalePlayers(g: Game, now = Date.now()): Game | null {
+  const lastSeen = g.lastSeen || {}
+  const threshold = 25000
+  const alive = g.players.filter((p) => (lastSeen[p.tokenHash] || 0) > now - threshold)
+  if (alive.length === g.players.length) return g
+  const removedCurrent = g.turnPlayerId && !alive.find((p) => p.id === g.turnPlayerId)
+  let turnPlayerId = g.turnPlayerId
+  if (removedCurrent) turnPlayerId = nextTurnId(alive, null)
+  const next: Game = { ...g, players: alive, turnPlayerId, updatedAt: now }
+  return alive.length === 0 ? null : next
+}
+
+function nextTurnId(players: Player[], currentId: string | null): string | null {
+  const idx = currentId ? players.findIndex((p) => p.id === currentId) : -1
+  for (let i = idx + 1; i < players.length; i++) {
+    const p = players[i]
+    if (!p.busted && !p.stood) return p.id
+  }
+  return null
+}
+
+export async function heartbeat(roomId: string, playerToken: string) {
+  const store = getStore()
+  const g = await store.get(roomId)
+  if (!g) return null
+  const tokenHash = hashToken(playerToken)
+  const lastSeen = { ...(g.lastSeen || {}), [tokenHash]: Date.now() }
+  const next = { ...g, lastSeen, updatedAt: Date.now() }
+  await store.set(next)
+  return next
+}
+
+export async function forceTimeout(roomId: string) {
+  const store = getStore()
+  let g = await store.get(roomId)
+  if (!g) return null
+  // purge stale players
+  const purged = purgeStalePlayers(g)
+  if (purged === null) {
+    await store.remove(roomId)
+    return null
+  }
+  if (purged !== g) {
+    g = purged
+    await store.set(g)
+  }
+  if (g.status !== 'in_round' || !g.turnPlayerId || (g as any).turnExpiresAt && Date.now() <= (g as any).turnExpiresAt) return g
+  const next = playerStand(g, g.turnPlayerId)
+  await store.set(next)
+  if (next.status === 'round_over') await settleBalances(next)
   return next
 }
 

@@ -19,6 +19,7 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
   const [error, setError] = useState<string | null>(null)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const [playerToken, setPlayerToken] = useState('')
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     // Ensure player token exists even on deep-link
@@ -78,8 +79,33 @@ export default function RoomPage({ params }: { params: Promise<{ roomId: string 
     return () => {
       if (channel && sb) sb.removeChannel(channel)
       if (timerRef.current) clearInterval(timerRef.current)
+      if (timeoutRef.current) clearInterval(timeoutRef.current)
     }
   }, [roomId, playerToken])
+
+  // Heartbeat + timeout tick
+  useEffect(() => {
+    if (!playerToken) return
+    const heartbeat = () => fetch(`/api/rooms/${roomId}/heartbeat`, { method: 'POST', headers: { 'x-player-token': playerToken } })
+    const hb = setInterval(heartbeat, 8000)
+    heartbeat()
+    const tick = () => {
+      const exp = state?.turnExpiresAt || 0
+      if (state?.status === 'in_round' && exp && Date.now() > exp) {
+        fetch(`/api/rooms/${roomId}/timeout`, { method: 'POST' })
+      }
+    }
+    timeoutRef.current = setInterval(tick, 1000)
+    const handleUnload = () => {
+      navigator.sendBeacon(`/api/rooms/${roomId}/action`, new Blob([JSON.stringify({ action: 'leave' })], { type: 'application/json' }))
+    }
+    window.addEventListener('beforeunload', handleUnload)
+    return () => {
+      clearInterval(hb)
+      if (timeoutRef.current) clearInterval(timeoutRef.current)
+      window.removeEventListener('beforeunload', handleUnload)
+    }
+  }, [playerToken, roomId, state?.turnExpiresAt, state?.status])
 
   const onAction = async (action: 'hit' | 'stand' | 'start') => {
     if (action === 'start') {

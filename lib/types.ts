@@ -33,6 +33,7 @@ export type Game = {
   dealer: Dealer
   status: GameStatus
   turnPlayerId: string | null
+  turnExpiresAt: number | null
   updatedAt: number
   message?: string
   settings: {
@@ -40,6 +41,7 @@ export type Game = {
     shuffleAt: number
   }
   shoe: Card[]
+  lastSeen?: Record<string, number>
 }
 
 export type ClientPlayer = Pick<Player, 'id' | 'seatId' | 'name' | 'cards' | 'value' | 'busted' | 'stood' | 'bet' | 'doubled' | 'insurance'>
@@ -51,6 +53,7 @@ export type ClientGameState = {
   dealer: ClientDealer
   status: GameStatus
   turnPlayerId: string | null
+  turnExpiresAt: number | null
   isHost: boolean
   me: (ClientPlayer & { seatId: string }) | null
   message?: string
